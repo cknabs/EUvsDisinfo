@@ -1,6 +1,7 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
 from csv import DictWriter
 from datetime import datetime
+from typing import List, Tuple
 
 import requests as req
 from bs4 import BeautifulSoup
@@ -27,79 +28,108 @@ def all_entries():
             offset += 1
 
 
-class MalformedDataException(Exception):
-    pass
+class Entry:
+    iso_date: str
+    title: str
+    id: str
+    outlets: List[str]
+    countries: List[str]
+    keywords: List[str]
+    summary: str
+    disproof: str
+    languages: List[str]
+    publications: List[Tuple[str, str]]
+
+    def __init__(self, entry):
+        try:
+            # Get basic data from database entry
+            date = get_data_column(entry, 'Date').contents[0].strip()
+            self.iso_date = datetime.strptime(date, '%d.%m.%Y').date().isoformat()
+            title_link = get_data_column(entry, 'Title').find('a')
+            self.title = title_link.contents[0].strip()
+            self.id = title_link['href']
+
+            self.outlets = [o.strip() for o in get_data_column(entry, 'Outlets').contents[0].split(',')]
+            self.countries = [c.strip() for c in get_data_column(entry, 'Country').contents[0].split(',')]
+        except Exception as exception:
+            raise MalformedDataError('malformed entry error', self.id) from exception
+
+        try:
+            # Get keywords, summary, disproof from report page
+            report = BeautifulSoup(req.get(self.id).text, 'html.parser')
+
+            self.keywords = report.find(text='Keywords:').parent.parent.contents[-1].strip()
+            self.summary = report.find(attrs={'class': 'b-report__summary-text'}).text.strip()
+            self.disproof = report.find(attrs={'class': 'b-report__disproof-text'}).text.strip()
+        except Exception as exception:
+            raise MalformedDataError('malformed report error', self.id) from exception
+
+        try:
+            # Get data on publications from report page
+            publications = report.find_all(attrs={'class': 'b-catalog__link'})
+            self.languages = [lang.strip() for lang in report.find(text='Language/target audience:').next.split(',')]
+            assert (len(publications) == len(self.outlets))
+
+            self.publications = []
+            for publication in publications:
+                links = [a['href'] for a in publication.find_all('a')]
+                assert 0 < len(links) <= 2
+                l1, l2 = links[0], links[1] if len(links) == 2 else None
+                self.publications.append((l1, l2))
+        except Exception as exception:
+            raise MalformedDataError('malformed publications error', self.id) from exception
 
 
-def check(condition):
-    if not condition:
-        raise MalformedDataException
+class MalformedDataError(Exception):
+    def __init__(self, message: str, id: str):
+        self.message = message
+        self.id = id
 
 
 def extract(entries):
-    POST_KEYS = ['date', 'id', 'title', 'countries', 'keywords', 'languages']
-    ANNOTATION_KEYS = ['id', 'summary', 'disproof']
-    PUBLICATION_KEYS = ['id', 'outlet', 'publication', 'archive']
+    post_keys = ['date', 'id', 'title', 'countries', 'keywords', 'languages']
+    annotation_keys = ['id', 'summary', 'disproof']
+    publication_keys = ['id', 'outlet', 'publication', 'archive']
 
     with open('posts.csv', 'w') as posts_file, \
             open('annotations.csv', 'w') as annotations_file, \
             open('publications.csv', 'w') as publications_file:
-        posts_writer = DictWriter(posts_file, POST_KEYS)
-        annotations_writer = DictWriter(annotations_file, ANNOTATION_KEYS)
-        publications_writer = DictWriter(publications_file, PUBLICATION_KEYS)
+        posts_writer = DictWriter(posts_file, post_keys)
+        posts_writer.writeheader()
+        annotations_writer = DictWriter(annotations_file, annotation_keys)
+        annotations_writer.writeheader()
+        publications_writer = DictWriter(publications_file, publication_keys)
+        publications_writer.writeheader()
 
-        for post in entries:
+        for entry_html in entries:
             try:
-                # Get basic data from database entry
-                date = get_data_column(post, 'Date').contents[0].strip()
-                iso_date = datetime.strptime(date, '%d.%m.%Y').date().isoformat()
-                title_link = get_data_column(post, 'Title').find('a')
-                title = title_link.contents[0].strip()
-                id = title_link['href']
+                entry = Entry(entry_html)
+            except MalformedDataError as mde:
+                print(f'WARNING: {repr(mde)} from {repr(mde.__cause__)}')
 
-                outlets = [o.strip() for o in get_data_column(post, 'Outlets').contents[0].split(',')]
-                countries = [c.strip() for c in get_data_column(post, 'Country').contents[0].split(',')]
+            posts_writer.writerow({
+                'date': entry.iso_date,
+                'id': entry.id,
+                'title': entry.title,
+                'countries': entry.countries,
+                'keywords': entry.keywords,
+                'languages': entry.languages
+            })
 
-                # Get keywords, summary, disproof from report page
-                report = BeautifulSoup(req.get(id).text, 'html.parser')
+            annotations_writer.writerow({
+                'id': entry.id,
+                'summary': entry.summary,
+                'disproof': entry.disproof
+            })
 
-                keywords = report.find(text='Keywords:').parent.parent.contents[-1].strip()
-                summary = report.find(attrs={'class': 'b-report__summary-text'}).text.strip()
-                disproof = report.find(attrs={'class': 'b-report__disproof-text'}).text.strip()
-
-                # Get data on publications from report page
-                publications = report.find_all(attrs={'class': 'b-catalog__link'})
-                languages = [lang.strip() for lang in report.find(text='Language/target audience:').next.split(',')]
-                check(len(publications) == len(outlets))
-
-                # Output data
-                posts_writer.writerow({
-                    'date': iso_date,
-                    'id': id,
-                    'title': title,
-                    'countries': countries,
-                    'keywords': keywords,
-                    'languages': languages
+            for publication, outlet in zip(entry.publications, entry.outlets):
+                link, archived_link = publication
+                publications_writer.writerow({
+                    'id': entry.id,
+                    'outlet': outlet,
+                    'publication': link,
+                    'archive': archived_link
                 })
-
-                annotations_writer.writerow({
-                    'id': id,
-                    'summary': summary,
-                    'disproof': disproof
-                })
-
-                for article, outlet in zip(publications, outlets):
-                    link, archived_link = [a['href'] for a in article.find_all('a')]
-                    publications_writer.writerow({
-                        'id': id,
-                        'outlet': outlet,
-                        'publication': link,
-                        'archive': archived_link
-                    })
-            except MalformedDataException:
-                print(f'WARNING: malformed data for {id}')
-            except Exception as e:
-                print(f'WARNING: encountered error {e} for {id}')
 
 
 extract(all_entries())
