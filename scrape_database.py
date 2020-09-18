@@ -1,6 +1,6 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
 from csv import DictWriter
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Tuple
 from warnings import warn
 
@@ -30,7 +30,7 @@ def all_entries():
 
 
 class Entry:
-    iso_date: str = ''
+    date: date
     title: str = ''
     id: str = ''
     outlets: List[str] = []
@@ -44,8 +44,8 @@ class Entry:
     def __init__(self, entry):
         # Get basic data from database entry
         try:
-            date = get_data_column(entry, 'Date').contents[0].strip()
-            self.iso_date = datetime.strptime(date, '%d.%m.%Y').date().isoformat()
+            date_str = get_data_column(entry, 'Date').contents[0].strip()
+            self.date = datetime.strptime(date_str, '%d.%m.%Y').date()
             title_link = get_data_column(entry, 'Title').find('a')
             self.title = title_link.contents[0].strip()
             self.id = title_link['href']
@@ -130,7 +130,7 @@ def extract(entries):
                 warn(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
 
             posts_writer.writerow({
-                'date': entry.iso_date,
+                'date': entry.date,
                 'id': entry.id,
                 'title': entry.title,
                 'countries': entry.countries,
