@@ -108,6 +108,12 @@ class MissingDataError(Exception):
         self.id = id
 
 
+def list2str(l: List[str]) -> str:
+    sep = '+'
+    assert all(sep not in elem for elem in l)
+    return sep.join(l)
+
+
 def extract(entries):
     post_keys = ['date', 'id', 'title', 'countries', 'keywords', 'languages', 'outlets']
     annotation_keys = ['id', 'summary', 'disproof']
@@ -133,10 +139,10 @@ def extract(entries):
                 'date': entry.date,
                 'id': entry.id,
                 'title': entry.title,
-                'countries': entry.countries,
-                'keywords': entry.keywords,
-                'languages': entry.languages,
-                'outlets': entry.outlets
+                'countries': list2str(entry.countries),
+                'keywords': list2str(entry.keywords),
+                'languages': list2str(entry.languages),
+                'outlets': list2str(entry.outlets)
             })
 
             annotations_writer.writerow({
