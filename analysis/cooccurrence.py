@@ -15,5 +15,5 @@ class CoOccurrence:
             for c in column_entries:
                 self.M[r][c] += 1
 
-    def get_dataframe(self) -> pd.Dataframe:
+    def get_dataframe(self) -> pd.DataFrame:
         return pd.DataFrame.from_dict(self.M)
