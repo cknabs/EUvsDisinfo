@@ -65,8 +65,9 @@ def plot_marginal(df: DataFrame):
     fig.show()
 
 
-df = pd.read_csv('../posts.csv',
-                 usecols=['date', 'id', 'countries', 'languages', 'keywords'])  # TODO: regenerate data/*.csv
+cols = ['date', 'id', 'countries', 'languages', 'keywords']
+dtypes = {c: 'string' for c in cols}
+df = pd.read_csv('../data/posts.csv', usecols=cols, dtype=dtypes).fillna('')
 
 LC_cooc = CoOccurrence()
 for ls, cs in zip(df['languages'], df['countries']):
