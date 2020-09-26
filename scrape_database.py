@@ -1,7 +1,8 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
 from csv import DictWriter
 from datetime import datetime, date
-from typing import List, Tuple
+from multiprocessing import Pool
+from typing import List, Tuple, Union
 from warnings import warn
 
 import requests as req
@@ -35,11 +36,6 @@ class Entry:
     id: str = ''
     outlets: List[str] = []
     countries: List[str] = []
-    keywords: List[str] = []
-    summary: str = ''
-    disproof: str = ''
-    languages: List[str] = []
-    publications: List[Tuple[str, str]] = []
 
     def __init__(self, entry):
         # Get basic data from database entry
@@ -54,6 +50,20 @@ class Entry:
             self.countries = [c.strip() for c in get_data_column(entry, 'Country').contents[0].split(',')]
         except Exception as exception:
             raise MalformedDataError('Malformed entry error', self.id) from exception
+
+
+class Report:
+    entry: Entry
+    id: str = ''
+    keywords: List[str] = []
+    summary: str = ''
+    disproof: str = ''
+    languages: List[str] = []
+    publications: List[Tuple[str, str]] = []
+
+    def __init__(self, entry: Entry):
+        self.entry = entry
+        self.id = self.entry.id
 
         # Get keywords, summary, disproof from report page
         try:
@@ -114,7 +124,23 @@ def list2str(l: List[str]) -> str:
     return sep.join(l)
 
 
-def extract(entries):
+def get_entry(entry_html) -> Union[Entry, None]:
+    try:
+        return Entry(entry_html)
+    except MalformedDataError as mde:
+        warn(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
+    return None
+
+
+def get_report(entry: Entry)-> Union[Report, None]:
+    try:
+        return Report(entry)
+    except MalformedDataError as mde:
+        warn(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
+    return None
+
+
+def extract(entries_html):
     post_keys = ['date', 'id', 'title', 'countries', 'keywords', 'languages', 'outlets']
     annotation_keys = ['id', 'summary', 'disproof']
     publication_keys = ['id', 'publication', 'archive']
@@ -129,31 +155,30 @@ def extract(entries):
         publications_writer = DictWriter(publications_file, publication_keys)
         publications_writer.writeheader()
 
-        for entry_html in entries:
-            try:
-                entry = Entry(entry_html)
-            except MalformedDataError as mde:
-                warn(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
+        pool = Pool(10)
+        entries = filter(lambda o: o is not None, map(get_entry, entries_html))
 
+        for report in filter(lambda o: o is not None, pool.imap(get_report, entries)):
+            entry = report.entry
             posts_writer.writerow({
                 'date': entry.date,
                 'id': entry.id,
                 'title': entry.title,
                 'countries': list2str(entry.countries),
-                'keywords': list2str(entry.keywords),
-                'languages': list2str(entry.languages),
+                'keywords': list2str(report.keywords),
+                'languages': list2str(report.languages),
                 'outlets': list2str(entry.outlets)
             })
 
             annotations_writer.writerow({
-                'id': entry.id,
-                'summary': entry.summary,
-                'disproof': entry.disproof
+                'id': report.id,
+                'summary': report.summary,
+                'disproof': report.disproof
             })
 
-            for link, archived_link in entry.publications:
+            for link, archived_link in report.publications:
                 publications_writer.writerow({
-                    'id': entry.id,
+                    'id': report.id,
                     'publication': link,
                     'archive': archived_link
                 })
