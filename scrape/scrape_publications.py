@@ -16,8 +16,8 @@ class Publication:
     authors: List[str]
     text: str
 
-    def __init__(self, url):
-        self.url = url
+    def __init__(self, url_):
+        self.url = url_
         try:
             article = Article(self.url)
             article.download()

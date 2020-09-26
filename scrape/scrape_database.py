@@ -2,7 +2,7 @@
 from csv import DictWriter
 from datetime import datetime, date
 from multiprocessing import Pool
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Generator
 from warnings import warn
 
 import requests as req
@@ -11,13 +11,8 @@ from bs4 import BeautifulSoup
 URL = 'https://euvsdisinfo.eu/disinformation-cases'
 
 
-def get_data_column(soup, data_col):
-    data_columns = soup.find_all(None, attrs={'data-column': data_col})
-    assert (len(data_columns) == 1)
-    return data_columns[0]
-
-
-def all_entries():
+def all_entries() -> Generator:
+    """Generator, yields all entries"""
     offset = 0
     while True:
         html = req.get(URL, params={'offset': offset, 'per_page': 100})
@@ -40,16 +35,22 @@ class Entry:
     def __init__(self, entry):
         # Get basic data from database entry
         try:
-            date_str = get_data_column(entry, 'Date').contents[0].strip()
+            date_str = self.get_data_column(entry, 'Date').contents[0].strip()
             self.date = datetime.strptime(date_str, '%d.%m.%Y').date()
-            title_link = get_data_column(entry, 'Title').find('a')
+            title_link = self.get_data_column(entry, 'Title').find('a')
             self.title = title_link.contents[0].strip()
             self.id = title_link['href']
 
-            self.outlets = [o.strip() for o in get_data_column(entry, 'Outlets').contents[0].split(',')]
-            self.countries = [c.strip() for c in get_data_column(entry, 'Country').contents[0].split(',')]
+            self.outlets = [o.strip() for o in self.get_data_column(entry, 'Outlets').contents[0].split(',')]
+            self.countries = [c.strip() for c in self.get_data_column(entry, 'Country').contents[0].split(',')]
         except Exception as exception:
             raise MalformedDataError('Malformed entry error', self.id) from exception
+
+    @staticmethod
+    def get_data_column(soup: BeautifulSoup, data_col):
+        data_columns = soup.find_all(None, attrs={'data-column': data_col})
+        assert (len(data_columns) == 1)
+        return data_columns[0]
 
 
 class Report:
@@ -107,24 +108,15 @@ class Report:
 
 
 class MalformedDataError(Exception):
-    def __init__(self, message: str, id: str):
+    def __init__(self, message: str, id_: str):
         self.message = message
-        self.id = id
-
-
-class MissingDataError(Exception):
-    def __init__(self, name: str, id: str):
-        self.name = name
-        self.id = id
-
-
-def list2str(l: List[str]) -> str:
-    sep = '+'
-    assert all(sep not in elem for elem in l)
-    return sep.join(l)
+        self.id = id_
 
 
 def get_entry(entry_html) -> Union[Entry, None]:
+    """Wrapper for :class:`Entry` initialization, return None on error.
+    Defined here to be picklable.
+    """
     try:
         return Entry(entry_html)
     except MalformedDataError as mde:
@@ -132,7 +124,10 @@ def get_entry(entry_html) -> Union[Entry, None]:
     return None
 
 
-def get_report(entry: Entry)-> Union[Report, None]:
+def get_report(entry: Entry) -> Union[Report, None]:
+    """Wrapper for :class:`Report` initialization, return None on error.
+    Defined here to be picklable.
+    """
     try:
         return Report(entry)
     except MalformedDataError as mde:
@@ -158,8 +153,14 @@ def extract(entries_html):
         pool = Pool(10)
         entries = filter(lambda o: o is not None, map(get_entry, entries_html))
 
+        def list2str(lst: List[str]) -> str:
+            sep = '+'
+            assert all(sep not in elem for elem in lst)
+            return sep.join(lst)
+
         for report in filter(lambda o: o is not None, pool.imap(get_report, entries)):
             entry = report.entry
+
             posts_writer.writerow({
                 'date': entry.date,
                 'id': entry.id,
@@ -184,4 +185,5 @@ def extract(entries_html):
                 })
 
 
-extract(all_entries())
+if __name__ == '__main__':
+    extract(all_entries())
