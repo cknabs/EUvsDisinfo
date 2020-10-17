@@ -65,6 +65,38 @@ def plot_marginal(data: DataFrame):
     fig.show()
 
 
+def plot_sankey(data: DataFrame, min_val: int = 50):
+    labels, sources, targets, values = [], [], [], []
+    labels = list(data.index) + list(data.columns)
+    idx = {name: i for i, name in enumerate(labels)}
+
+    for index, row in data.iterrows():
+        if len(index) == 0:
+            continue
+        for col, val in row.iteritems():
+            if len(col) == 0:
+                continue
+            if val > min_val:
+                sources.append(idx[index])
+                targets.append(idx[col])
+                values.append(val)
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(
+            label=labels,
+            color='black'
+        ),
+        link=dict(
+            source=sources,
+            target=targets,
+            value=values,
+            color='gray'
+        ),
+        orientation='h'
+    )])
+    fig.show()
+
+
 if __name__ == '__main__':
     cols = ['date', 'id', 'countries', 'languages', 'keywords']
     dtypes = {c: 'string' for c in cols}
@@ -81,8 +113,9 @@ if __name__ == '__main__':
     LC = sort_by_sum(LC_cooc.get_dataframe())
     LK = sort_by_sum(LK_cooc.get_dataframe())
 
-    plot_marginal(LC)
-    plot_marginal(LK)
+    plot_sankey(LC.transpose())
+    # plot_marginal(LC)
+    # plot_marginal(LK)
 
 # df['lang_iso'] = df['languages'].apply(lambda ls: [language_to_iso2(l) for l in ls.split('+')])
 # df['cc'] = df['countries'].apply(lambda cs: [territory_to_iso3(c) for c in cs.split('+')])
