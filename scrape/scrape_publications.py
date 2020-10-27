@@ -2,12 +2,13 @@ import argparse
 import csv
 import sys
 from datetime import date
+from itertools import islice
 from typing import List, Dict, Optional
 from warnings import warn
 
 from newspaper import Article, ArticleException
 
-from scrape.util import list2str
+from util import list2str
 
 
 class Publication:
@@ -58,29 +59,38 @@ class Publication:
 
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser(description="Scrape publications listed in the euvsdisinfo.eu database. ")
-    # parser.add_argument('-i', metavar='infile', help="CSV file listing publications",
-    #                     type=argparse.FileType('r'), default='out.csv')
-    # parser.add_argument('-o', metavar='outfile', help="output file", type=argparse.FileType('w'),
-    #                     default=sys.stdout)
+    def check_non_negative(string: str) -> int:
+        value = int(string)
+        if value < 0:
+            raise argparse.ArgumentTypeError(f"argument must be positive (was {value})")
+        return value
 
-    # args = parser.parse_args()
-    # with args.i as infile, \
-    #         args.o as outfile:
-    with open('../data/publications.csv', 'r') as infile, open('out.csv', 'w') as outfile:
+
+    parser = argparse.ArgumentParser(description="Scrape publications listed in the euvsdisinfo.eu database. ")
+    parser.add_argument('input', metavar='IN', nargs='?',
+                        help="CSV file listing publications (default: stdin)",
+                        type=argparse.FileType('r'), default=sys.stdin)
+    parser.add_argument('-o', '--output', metavar='OUT',
+                        help="where to output the scraped results (default: stdout)",
+                        type=argparse.FileType('w'), default=sys.stdout)
+    parser.add_argument('-n', '--lines', metavar='N',
+                        help="number of entries to scrape",
+                        type=check_non_negative, default=None)
+
+    args = parser.parse_args()
+    with args.input as infile, args.output as outfile:
         reader = csv.DictReader(infile)
         writer = None
-        for i, row in enumerate(reader):
+        for row in islice(reader, args.lines):
             pub_id = row['id']
             url = row['publication']
+
             publication = Publication(url)
             dict_pub = publication.to_str_dict()
             del dict_pub['text']
             dict_pub['id'] = pub_id
+
             if writer is None:
                 writer = csv.DictWriter(outfile, fieldnames=dict_pub.keys())
                 writer.writeheader()
             writer.writerow(dict_pub)
-
-            if i > 1000:
-                break
