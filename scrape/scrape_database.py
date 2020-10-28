@@ -1,14 +1,20 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
+import argparse
+import logging
 from csv import DictWriter
-from datetime import datetime, date
+from datetime import date, datetime
+from itertools import islice
 from multiprocessing import Pool
-from typing import List, Tuple, Union, Generator
-from warnings import warn
+from typing import Generator, List, Tuple, Union
 
 import requests as req
 from bs4 import BeautifulSoup
+from tqdm import tqdm
+
+from util import check_non_negative, list2str
 
 URL = 'https://euvsdisinfo.eu/disinformation-cases'
+LOGGER = logging.getLogger(__name__)
 
 
 def all_entries() -> Generator:
@@ -17,12 +23,22 @@ def all_entries() -> Generator:
     while True:
         html = req.get(URL, params={'offset': offset, 'per_page': 100})
         soup = BeautifulSoup(html.text, 'html.parser')
-        all_posts = soup.find_all('div', attrs={'class': 'disinfo-db-post'})
+        all_posts = soup.find_all(attrs={'class': 'disinfo-db-post'})
         if len(all_posts) == 0:
             return
         for post in all_posts:
             yield post
             offset += 1
+
+
+def get_total_entries() -> int:
+    html = req.get(URL)
+    soup = BeautifulSoup(html.text, 'html.parser')
+    return int(
+        soup.find(attrs={'class': 'disinfo-db-results'})
+            .find('span')
+            .contents[0]
+    )
 
 
 class Entry:
@@ -104,7 +120,7 @@ class Report:
             raise MalformedDataError('Malformed publications error', self.id) from exception
 
     def warn_missing(self, name: str):
-        warn(f"Missing data '{name}' for {self.id}")
+        LOGGER.warning(f"Missing data '{name}' for {self.id}")
 
 
 class MalformedDataError(Exception):
@@ -120,7 +136,7 @@ def get_entry(entry_html) -> Union[Entry, None]:
     try:
         return Entry(entry_html)
     except MalformedDataError as mde:
-        warn(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
+        LOGGER.warning(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
     return None
 
 
@@ -131,59 +147,103 @@ def get_report(entry: Entry) -> Union[Report, None]:
     try:
         return Report(entry)
     except MalformedDataError as mde:
-        warn(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
+        LOGGER.warning(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
     return None
 
 
-def extract(entries_html):
+def extract(entries_html, posts_out, annotations_out, publications_out, n_jobs):
     post_keys = ['date', 'id', 'title', 'countries', 'keywords', 'languages', 'outlets']
     annotation_keys = ['id', 'summary', 'disproof']
     publication_keys = ['id', 'publication', 'archive']
 
-    with open('posts.csv', 'w') as posts_file, \
-            open('annotations.csv', 'w') as annotations_file, \
-            open('publications.csv', 'w') as publications_file:
-        posts_writer = DictWriter(posts_file, post_keys)
-        posts_writer.writeheader()
-        annotations_writer = DictWriter(annotations_file, annotation_keys)
-        annotations_writer.writeheader()
-        publications_writer = DictWriter(publications_file, publication_keys)
-        publications_writer.writeheader()
+    posts_writer = DictWriter(posts_out, post_keys)
+    posts_writer.writeheader()
+    annotations_writer = DictWriter(annotations_out, annotation_keys)
+    annotations_writer.writeheader()
+    publications_writer = DictWriter(publications_out, publication_keys)
+    publications_writer.writeheader()
 
-        pool = Pool(10)
-        entries = filter(lambda o: o is not None, map(get_entry, entries_html))
+    pool = Pool(n_jobs)
+    entries = filter(lambda o: o is not None, map(get_entry, entries_html))
 
-        def list2str(lst: List[str]) -> str:
-            sep = '+'
-            assert all(sep not in elem for elem in lst)
-            return sep.join(lst)
+    for report in filter(lambda o: o is not None, pool.imap(get_report, entries)):
+        entry = report.entry
 
-        for report in filter(lambda o: o is not None, pool.imap(get_report, entries)):
-            entry = report.entry
+        posts_writer.writerow({
+            'date': entry.date,
+            'id': entry.id,
+            'title': entry.title,
+            'countries': list2str(entry.countries),
+            'keywords': list2str(report.keywords),
+            'languages': list2str(report.languages),
+            'outlets': list2str(entry.outlets)
+        })
 
-            posts_writer.writerow({
-                'date': entry.date,
-                'id': entry.id,
-                'title': entry.title,
-                'countries': list2str(entry.countries),
-                'keywords': list2str(report.keywords),
-                'languages': list2str(report.languages),
-                'outlets': list2str(entry.outlets)
-            })
+        annotations_writer.writerow({
+            'id': report.id,
+            'summary': report.summary,
+            'disproof': report.disproof
+        })
 
-            annotations_writer.writerow({
+        for link, archived_link in report.publications:
+            publications_writer.writerow({
                 'id': report.id,
-                'summary': report.summary,
-                'disproof': report.disproof
+                'publication': link,
+                'archive': archived_link
             })
-
-            for link, archived_link in report.publications:
-                publications_writer.writerow({
-                    'id': report.id,
-                    'publication': link,
-                    'archive': archived_link
-                })
 
 
 if __name__ == '__main__':
-    extract(all_entries())
+    parser = argparse.ArgumentParser(description="Scrape entries listed in the euvsdisinfo.eu database. ")
+    parser.add_argument('posts', metavar='POSTS',
+                        help="where to output the scraped posts",
+                        type=argparse.FileType('w'))
+    parser.add_argument('annotations', metavar='ANNOTATIONS',
+                        help="where to output the scraped annotations",
+                        type=argparse.FileType('w'))
+    parser.add_argument('publications', metavar='PUBLICATIONS',
+                        help="where to output the scraped publications list",
+                        type=argparse.FileType('w'))
+
+    parser.add_argument('-n', '--lines', metavar='N',
+                        help="number of entries to scrape",
+                        type=check_non_negative, default=None)
+    parser.add_argument('-j', '--jobs', metavar='N',
+                        help="number of jobs to use (default: %(default)s)",
+                        type=check_non_negative, default=10)
+
+    group = parser.add_argument_group('verbosity arguments')
+    group_warnings = group.add_mutually_exclusive_group()
+    group_warnings.add_argument('-w', '--show-warnings', dest='show_warnings',
+                                help="show warnings",
+                                action='store_true', default=False)
+    group_warnings.add_argument('-nw', '--no-warnings', dest='show_warnings',
+                                help="hide warnings (default)",
+                                action='store_false')
+    group_progress = group.add_mutually_exclusive_group()
+    group_progress.add_argument('-p', '--show-progress', dest='show_progress',
+                                help="show progress bar (default)",
+                                action='store_true', default=True)
+    group_progress.add_argument('-np', '--no-progress', dest='show_progress',
+                                help="hide progress bar",
+                                action='store_false')
+
+    args = parser.parse_args()
+
+    if not args.show_warnings:
+        LOGGER.setLevel(logging.ERROR)
+
+    with args.posts as posts_file, \
+            args.annotations as annotations_file, \
+            args.publications as publications_file:
+
+        iterator = islice(all_entries(), args.lines)
+        if args.show_progress:
+            total_entries = get_total_entries() if args.lines is None else args.lines
+            iterator = tqdm(iterator, total=total_entries)
+
+        extract(iterator,
+                posts_out=posts_file,
+                annotations_out=annotations_file,
+                publications_out=publications_file,
+                n_jobs=args.jobs)
