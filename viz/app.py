@@ -1,5 +1,8 @@
 from urllib.parse import urlparse
 
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
 import pandas as pd
 
 from analysis.cooccurrence import CoOccurrence
@@ -26,8 +29,22 @@ if __name__ == '__main__':
 
     res_social = sort(cooc_social.get_dataframe())
     res_content = sort(cooc_content.get_dataframe())
-    res_topic = sort(cooc_topic.get_dataframe())
+    # res_topic = sort(cooc_topic.get_dataframe())
 
-    fig_graph(res_social, percentile_cutoff=0).show()
-    fig_graph(res_content, percentile_cutoff=0).show()
-    # plot_graph(res_topic, percentile_cutoff=0.9).show()
+    fig_social = fig_graph(res_social, 'Publishers and Social Media Profiles', percentile_cutoff=0.9)
+    fig_content = fig_graph(res_content, 'Publishers', percentile_cutoff=0.9)
+
+    app = dash.Dash(__name__)
+    app.layout = html.Div(children=[
+        html.H1(children='Exploring the EUvsDisinfo database'),
+        html.Div(
+            dcc.Graph(id='social', figure=fig_social),
+            style=dict(width='50%', display='inline-block'),
+        ),
+        html.Div(
+            dcc.Graph(id='publishers', figure=fig_content),
+            style=dict(width='50%', display='inline-block')
+        )
+    ])
+
+    app.run_server(debug=True)
