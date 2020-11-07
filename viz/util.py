@@ -1,8 +1,12 @@
+import logging
+
 import igraph as ig
 import numpy as np
 import plotly.graph_objects as go
 from pandas import DataFrame
 from plotly.graph_objs import Figure
+
+LOGGER = logging.getLogger(__name__)
 
 
 def explode_replace(data: DataFrame, old_name: str, new_name: str):
@@ -76,20 +80,23 @@ def plot_raw(data: DataFrame):
     fig.show()
 
 
-def fig_graph(data: DataFrame, trace_name: str, percentile_cutoff: float = 0.5, percentile_bins: int = 100) -> Figure:
+def fig_graph(data: DataFrame, title: str, percentile_cutoff: float = 0.5, percentile_bins: int = 100) -> Figure:
+    data = data.copy()
     assert 0.0 <= percentile_cutoff <= 1.0
     assert percentile_bins > 0
     assert list(data.index) == list(data.columns)
     assert np.allclose(data.values, data.transpose().values, equal_nan=True)
 
     np.fill_diagonal(data.values, np.nan)
+    print(f"Creating figure for dataframe of shape {data.shape}")
 
     drop_labels = data[data.sum().rank(method='first', pct=True) <= percentile_cutoff].index
+    print(f"\t{percentile_cutoff=}, dropping {len(drop_labels)} entries")
     data.drop(drop_labels, axis=0, inplace=True)
     data.drop(drop_labels, axis=1, inplace=True)
 
     G = ig.Graph.Adjacency(
-        np.where(np.isfinite(data.values), True, False).tolist(),
+        np.where(np.logical_and(np.isfinite(data.values), np.greater(data.values, 0)), True, False).tolist(),
         mode=ig.ADJ_UNDIRECTED
     )
 
@@ -102,12 +109,21 @@ def fig_graph(data: DataFrame, trace_name: str, percentile_cutoff: float = 0.5, 
     x_n, y_n, z_n = list(zip(*layout))
 
     min_size, max_size = 5, 10  # in px
-    sizes = data.sum(axis=0)
-    sizes /= sizes.max()  # in [0, 1]
-    sizes = min_size + (max_size - min_size) * sizes  # in [min_size, max_size]
+    if data.shape[0] > 1:
+        sizes = data.sum(axis=0)
+        sizes /= sizes.max()  # in [0, 1]
+        sizes = min_size + (max_size - min_size) * sizes  # in [min_size, max_size]
+    else:
+        sizes = [max_size for _ in range(data.shape[0])]
 
-    centralities = np.array(G.betweenness())
-    centralities = (centralities - centralities.min()) / (centralities.max() - centralities.min())
+    weights = list(data.fillna(0).values[e.source][e.target].item()
+                   for e in G.es)
+    if len(weights) > 0:
+        centralities = np.array(G.betweenness(weights=weights))
+        if centralities.min() != centralities.max():
+            centralities = (centralities - centralities.min()) / (centralities.max() - centralities.min())
+    else:
+        centralities = []
 
     node_trace = go.Scatter3d(
         x=x_n, y=y_n, z=z_n,
@@ -128,8 +144,9 @@ def fig_graph(data: DataFrame, trace_name: str, percentile_cutoff: float = 0.5, 
         hoverlabel=dict(
             bgcolor='white'
         ),
-        name=trace_name,
+        showlegend=False
     )
+    print(f"\tcreated scatter plot with {len(x_n)} nodes")
 
     percentiles = data.unstack().rank(method='first', pct=True).values.reshape(data.shape)
     x_e = {i: [] for i in range(percentile_bins)}
@@ -167,8 +184,10 @@ def fig_graph(data: DataFrame, trace_name: str, percentile_cutoff: float = 0.5, 
         )
         for i in range(percentile_bins)
     ]
+    print(f"\tcreated scatter plot with {len(G.es)} edges across {percentile_bins} bins")
 
     layout = go.Layout(
+        title=title,
         scene=dict(
             xaxis=dict(visible=False),
             yaxis=dict(visible=False),

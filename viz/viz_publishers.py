@@ -28,6 +28,9 @@ if __name__ == '__main__':
     res_content = sort(cooc_content.get_dataframe())
     res_topic = sort(cooc_topic.get_dataframe())
 
-    fig_graph(res_social, percentile_cutoff=0).show()
-    fig_graph(res_content, percentile_cutoff=0).show()
+    percentile_cutoff = 0.8
+
+
+    fig_graph(res_social, 'social', percentile_cutoff=percentile_cutoff).show()
+    fig_graph(res_content, 'content', percentile_cutoff=percentile_cutoff).show()
     # plot_graph(res_topic, percentile_cutoff=0.9).show()
