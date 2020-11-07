@@ -7,7 +7,7 @@ from analysis.cooccurrence import CoOccurrence
 from viz.util import sort
 
 # Create Dash App
-app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
+app = dash.Dash(__name__)
 
 # Load data
 cols = ['url', 'title', 'date', 'language', 'authors', 'twitter', 'facebook', 'id']
@@ -19,6 +19,7 @@ df['domain'] = df['url'].apply(lambda url: urlparse(url).netloc)
 cooc_social = CoOccurrence()
 cooc_content = CoOccurrence()
 cooc_topic = CoOccurrence()
+# TODO: add tqdm
 for _, group in df.groupby('id'):
     for entries in zip(group['twitter'], group['facebook'], group['domain']):
         entries = [e for e in entries if len(e) > 0]  # Omit empty entries (NA in original data)

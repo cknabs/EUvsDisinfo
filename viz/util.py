@@ -2,6 +2,7 @@ import logging
 
 import igraph as ig
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from pandas import DataFrame
 from plotly.graph_objs import Figure
@@ -87,6 +88,7 @@ def fig_graph(data: DataFrame, title: str, percentile_cutoff: float = 0.5, perce
     assert list(data.index) == list(data.columns)
     assert np.allclose(data.values, data.transpose().values, equal_nan=True)
 
+    diag = data.values.diagonal().copy()
     np.fill_diagonal(data.values, np.nan)
     print(f"Creating figure for dataframe of shape {data.shape}")
 
@@ -110,7 +112,7 @@ def fig_graph(data: DataFrame, title: str, percentile_cutoff: float = 0.5, perce
 
     min_size, max_size = 5, 10  # in px
     if data.shape[0] > 1:
-        sizes = data.sum(axis=0)
+        sizes = diag
         sizes /= sizes.max()  # in [0, 1]
         sizes = min_size + (max_size - min_size) * sizes  # in [min_size, max_size]
     else:
