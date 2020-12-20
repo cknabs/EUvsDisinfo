@@ -1,5 +1,7 @@
-import dash_html_components as html
 import dash_core_components as dcc
+import dash_html_components as html
+
+from callbacks import update_timeline
 
 emptyrow = html.Div([html.Div([html.Br()],
                               className='col')],
@@ -24,6 +26,7 @@ slider = html.Div([
     ], className='col')
 ], className='row')
 graphs = html.Div([
+    dcc.Graph(id='fig-timeline', figure=update_timeline()),
     dcc.Graph(id='fig-social'),
     dcc.Graph(id='fig-publishers')
 ], className='col')

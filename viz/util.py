@@ -2,7 +2,6 @@ import logging
 
 import igraph as ig
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 from pandas import DataFrame
 from plotly.graph_objs import Figure
@@ -11,7 +10,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def explode_replace(data: DataFrame, old_name: str, new_name: str):
-    # data[old_name] = data[old_name].str.split('+')
+    data[old_name] = data[old_name].str.split('+')
     data = data.explode(old_name)
     data = data.rename(columns={old_name: new_name})
     return data
@@ -20,7 +19,7 @@ def explode_replace(data: DataFrame, old_name: str, new_name: str):
 def split(data: DataFrame, column: str, fill_na=None):
     res = data[column].str.split('+')
     if fill_na is not None:
-        res.fillna('', inplace=True)
+        res.fillna(fill_na, inplace=True)
     return res
 
 
