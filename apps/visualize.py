@@ -8,7 +8,7 @@ from sklearn.manifold import SpectralEmbedding
 from sklearn.preprocessing import MultiLabelBinarizer
 
 from analysis.cooccurrence import CoOccurrence
-from viz.util import sort, split
+from apps.util import sort, split
 
 
 def plot_marginal(data: DataFrame):

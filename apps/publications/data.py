@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 import pandas as pd
 
 from analysis.cooccurrence import CoOccurrence
-from viz.util import sort
+from apps.util import sort
 
 cols = ['url', 'title', 'date', 'language', 'authors', 'twitter', 'facebook', 'id']
 dtypes = {c: 'string' for c in cols}

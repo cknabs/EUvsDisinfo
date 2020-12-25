@@ -1,6 +1,6 @@
 import pandas as pd
 
-from viz.util import explode_replace
+from apps.util import explode_replace
 
 # Data
 cols = ['date', 'countries', 'languages', 'keywords']
