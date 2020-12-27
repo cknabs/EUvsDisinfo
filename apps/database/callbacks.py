@@ -1,5 +1,5 @@
+import pandas as pd
 from plotly import graph_objects as go
-from scipy import signal
 
 from apps.database.data import date_language
 
@@ -9,31 +9,22 @@ from apps.database.data import date_language
 # )
 def update_timeline():
     # TODO: add index to timeline
-    # TODO: average over week -> get top keywords in each language for each week
+    # TODO: average over month -> get top keywords in each language for each months
+
     sorted_dl = date_language.sum(axis=0).sort_values(ascending=False)
     total_dl = date_language.sum(axis=1)
-    # smoothed_dl = signal.savgol_filter(date_language, window_length=7, polyorder=3)
-    smoothed_total_dl = signal.savgol_filter(total_dl, window_length=31, polyorder=3)
     top = sorted_dl.drop('Other')[:5].index
 
-    traces = [
-        go.Scatter(
-            x=date_language.index, y=smoothed_total_dl,
-            mode='lines',
-            line=dict(
-                dash='dot',
-                color='black'
-            ),
-            name='Total',
-        )
-    ]
+    month_year = date_language.index.strftime('%b %Y')
 
-    traces += [
-        go.Scatter(
-            x=date_language.index, y=signal.savgol_filter(date_language[col], window_length=31, polyorder=3),
-            mode='lines',
+    traces = [
+        go.Bar(
+            x=month_year,
+            y=date_language[col],
             visible=True if col in top else 'legendonly',
             name=col,
+            customdata=pd.concat([date_language.index.to_series(), date_language[col]], axis=1),
+            hovertemplate='%{customdata[0]|%Y-%m-%d}: %{customdata[1]}'
         )
         for col in sorted_dl.index
     ]
@@ -41,9 +32,13 @@ def update_timeline():
     layout = go.Layout(
         title='Timeline',
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        plot_bgcolor='rgba(0,0,0,0)',
+        barmode='stack',
+        xaxis=dict(
+            tickangle=-45
+        ),
     )
-
     fig = go.Figure(data=traces, layout=layout)
     fig.update_xaxes(rangeslider_visible=True)
+
     return fig
