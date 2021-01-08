@@ -1,7 +1,7 @@
 import argparse
 from typing import List
 
-LIST_SEPARATOR: str = '+'
+LIST_SEPARATOR: str = "+"
 
 
 def list2str(lst: List[str]) -> str:
@@ -16,5 +16,7 @@ def str2list(string: str) -> List[str]:
 def check_non_negative(string: str) -> int:
     value = int(string)
     if value < 0:
-        raise argparse.ArgumentTypeError(f"argument must be positive (was {value})")
+        raise argparse.ArgumentTypeError(
+            f"argument must be positive (was {value})"
+        )
     return value

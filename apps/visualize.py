@@ -12,42 +12,64 @@ from apps.util import sort, split
 
 
 def plot_marginal(data: DataFrame):
-    sum_of_rows = data.sum(axis='columns')
-    sum_of_cols = data.sum(axis='index')
-    data['sum_of_rows'] = sum_of_rows
-    data.loc['sum_of_cols'] = sum_of_cols
-    data = data.sort_values(by='sum_of_rows', ascending=False, axis='index') \
-        .sort_values(by='sum_of_cols', ascending=False, axis='columns')
-    fig = make_subplots(rows=2, cols=2,
-                        row_heights=[0.2, 0.8], column_width=[0.8, 0.2],
-                        vertical_spacing=0.01, horizontal_spacing=0.01
-                        )
-    fig.update_layout(template='plotly_dark')
+    sum_of_rows = data.sum(axis="columns")
+    sum_of_cols = data.sum(axis="index")
+    data["sum_of_rows"] = sum_of_rows
+    data.loc["sum_of_cols"] = sum_of_cols
+    data = data.sort_values(
+        by="sum_of_rows", ascending=False, axis="index"
+    ).sort_values(by="sum_of_cols", ascending=False, axis="columns")
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        row_heights=[0.2, 0.8],
+        column_width=[0.8, 0.2],
+        vertical_spacing=0.01,
+        horizontal_spacing=0.01,
+    )
+    fig.update_layout(template="plotly_dark")
 
-    colorscale = 'solar'
+    colorscale = "solar"
 
-    fig.add_trace(go.Bar(y=data.transpose()['sum_of_cols'],
-                         x=data.columns[:-1],
-                         showlegend=False,
-                         marker=dict(color=data.transpose()['sum_of_cols'], colorscale=colorscale)),
-                  row=1, col=1)
+    fig.add_trace(
+        go.Bar(
+            y=data.transpose()["sum_of_cols"],
+            x=data.columns[:-1],
+            showlegend=False,
+            marker=dict(
+                color=data.transpose()["sum_of_cols"], colorscale=colorscale
+            ),
+        ),
+        row=1,
+        col=1,
+    )
     fig.update_xaxes(visible=False, row=1, col=1)
-    fig.add_trace(go.Bar(x=data['sum_of_rows'],
-                         y=data.index[:-1],
-                         orientation='h',
-                         showlegend=False,
-                         marker=dict(color=data['sum_of_rows'], colorscale=colorscale)),
-                  row=2, col=2)
+    fig.add_trace(
+        go.Bar(
+            x=data["sum_of_rows"],
+            y=data.index[:-1],
+            orientation="h",
+            showlegend=False,
+            marker=dict(color=data["sum_of_rows"], colorscale=colorscale),
+        ),
+        row=2,
+        col=2,
+    )
     fig.update_yaxes(visible=False, row=2, col=2)
 
-    fig.add_heatmap(z=data.drop('sum_of_rows', axis='columns').drop('sum_of_cols', axis='index'),
-                    x=data.columns[:-1],
-                    y=data.index[:-1],
-                    hoverongaps=False,
-                    showlegend=False,
-                    showscale=False,
-                    colorscale=colorscale,
-                    row=2, col=1)
+    fig.add_heatmap(
+        z=data.drop("sum_of_rows", axis="columns").drop(
+            "sum_of_cols", axis="index"
+        ),
+        x=data.columns[:-1],
+        y=data.index[:-1],
+        hoverongaps=False,
+        showlegend=False,
+        showscale=False,
+        colorscale=colorscale,
+        row=2,
+        col=1,
+    )
     fig.show()
 
 
@@ -60,13 +82,21 @@ def plot_graph(data: DataFrame, min_val: int = 0):
     np.fill_diagonal(data.values, np.nan)
 
     PERCENTILE_CUTOFF = 0.5
-    drop_labels = data[data.sum().rank(method='first', pct=True) <= PERCENTILE_CUTOFF].index
+    drop_labels = data[
+        data.sum().rank(method="first", pct=True) <= PERCENTILE_CUTOFF
+    ].index
     data.drop(drop_labels, axis=0, inplace=True)
     data.drop(drop_labels, axis=1, inplace=True)
 
     G = ig.Graph.Adjacency(
-        np.where(np.logical_and(np.isfinite(data.values), np.greater(data.values, min_val)), True, False).tolist(),
-        mode=ig.ADJ_UNDIRECTED
+        np.where(
+            np.logical_and(
+                np.isfinite(data.values), np.greater(data.values, min_val)
+            ),
+            True,
+            False,
+        ).tolist(),
+        mode=ig.ADJ_UNDIRECTED,
     )
     # G.es['weight'] = data[data > min_val].values
 
@@ -82,7 +112,11 @@ def plot_graph(data: DataFrame, min_val: int = 0):
     G = clustering.graph
     clusters = clustering.membership
 
-    percentiles = data.unstack().rank(method='first', pct=True).values.reshape(data.shape)
+    percentiles = (
+        data.unstack()
+        .rank(method="first", pct=True)
+        .values.reshape(data.shape)
+    )
     k: int = 10
     Xe = {i: [] for i in range(k)}
     Ye = {i: [] for i in range(k)}
@@ -105,12 +139,8 @@ def plot_graph(data: DataFrame, min_val: int = 0):
             val = (val - 1 - k / 2) / (k / 2 - 2)
             return min_alpha + (max_alpha - min_alpha) * val
 
-    We = {
-        i: get_width(i) for i in range(k)
-    }
-    Ae = {
-        i: get_alpha(i) for i in range(k)
-    }
+    We = {i: get_width(i) for i in range(k)}
+    Ae = {i: get_alpha(i) for i in range(k)}
     traces = []
     quantiles = []
     for e in G.es:
@@ -140,14 +170,15 @@ def plot_graph(data: DataFrame, min_val: int = 0):
 
     for i in range(k):
         if We[i] > 0:
-            traces.append(go.Scatter3d(
-                x=Xe[i], y=Ye[i], z=Ze[i],
-                mode='lines',
-                line=dict(
-                    width=We[i],
-                    color=f'rgba(0,0,0,{Ae[i]})'
+            traces.append(
+                go.Scatter3d(
+                    x=Xe[i],
+                    y=Ye[i],
+                    z=Ze[i],
+                    mode="lines",
+                    line=dict(width=We[i], color=f"rgba(0,0,0,{Ae[i]})"),
                 )
-            ))
+            )
 
     min_size, max_size = 2, 20  # in px
     sizes = data.sum(axis=0)
@@ -155,34 +186,34 @@ def plot_graph(data: DataFrame, min_val: int = 0):
     sizes = min_size + (max_size - min_size) * sizes  # in [min_size, max_size]
 
     node_trace = go.Scatter3d(
-        x=Xn, y=Yn, z=Zn,
-        mode='markers',
+        x=Xn,
+        y=Yn,
+        z=Zn,
+        mode="markers",
         marker=dict(
             size=sizes,
             # color=data.sum(axis=0),
             color=clusters,
-            colorscale='Jet'
-        )
+            colorscale="Jet",
+        ),
     )
 
-    fig = go.Figure(
-        data=traces + [node_trace]
-    )
+    fig = go.Figure(data=traces + [node_trace])
     fig.show()
 
 
 def plot_cooc(df: DataFrame):
     LC_cooc = CoOccurrence()
-    for ls, cs in zip(df['languages'], df['countries']):
-        LC_cooc.update(ls.split('+'), cs.split('+'))
+    for ls, cs in zip(df["languages"], df["countries"]):
+        LC_cooc.update(ls.split("+"), cs.split("+"))
 
     LK_cooc = CoOccurrence()
-    for ls, k in zip(df['languages'], df['keywords']):
-        LK_cooc.update(ls.split('+'), k.split('+'))
+    for ls, k in zip(df["languages"], df["keywords"]):
+        LK_cooc.update(ls.split("+"), k.split("+"))
 
     KK_cooc = CoOccurrence()
-    for k in df['keywords']:
-        KK_cooc.update(k.split('+'), k.split('+'))
+    for k in df["keywords"]:
+        KK_cooc.update(k.split("+"), k.split("+"))
 
     LC = sort(LC_cooc.get_dataframe())
     LK = sort(LK_cooc.get_dataframe())
@@ -209,24 +240,32 @@ def multi_label_binarize(data: DataFrame, columns, prepend_cols=None):
         if prepend_cols is not None:
             new_columns = [prepend_cols[i] + nc for nc in new_columns]
 
-        features.append(pd.DataFrame(binarized, columns=new_columns, index=data.index))
+        features.append(
+            pd.DataFrame(binarized, columns=new_columns, index=data.index)
+        )
 
     return pd.concat(features, axis=1)
 
 
-if __name__ == '__main__':
-    cols = ['date', 'id', 'countries', 'languages', 'keywords']
-    dtypes = {c: 'string' for c in cols}
-    df = pd.read_csv('../data/posts.csv', usecols=cols, dtype=dtypes)  # .fillna('')
+if __name__ == "__main__":
+    cols = ["date", "id", "countries", "languages", "keywords"]
+    dtypes = {c: "string" for c in cols}
+    df = pd.read_csv(
+        "../data/posts.csv", usecols=cols, dtype=dtypes
+    )  # .fillna('')
 
-    df['countries_list'] = split(df, 'countries', fill_na='')
-    df['languages_list'] = split(df, 'languages', fill_na='')
-    df['keywords_list'] = split(df, 'keywords', fill_na='')
+    df["countries_list"] = split(df, "countries", fill_na="")
+    df["languages_list"] = split(df, "languages", fill_na="")
+    df["keywords_list"] = split(df, "keywords", fill_na="")
 
     # mlb = MultiLabelBinarizer()  # sparse_output=True)
     # features = pd.DataFrame(mlb.fit_transform(df['countries']), columns=['C: ' + c for c in mlb.classes_],
     #                       index=df.index)
-    features = multi_label_binarize(df, ['countries_list', 'languages_list', 'keywords_list'], ['C ', 'L ', 'K '])
+    features = multi_label_binarize(
+        df,
+        ["countries_list", "languages_list", "keywords_list"],
+        ["C ", "L ", "K "],
+    )
 
     # manifold = Isomap(n_components=3, n_jobs=-1)
     manifold = SpectralEmbedding(n_components=3, n_jobs=-1)
@@ -237,29 +276,27 @@ if __name__ == '__main__':
     embedded = manifold.fit_transform(features)
 
     targets = pd.Categorical(
-        df['languages'],
+        df["languages"],
         ordered=True,
-        categories=df['languages'].value_counts(ascending=True).index
+        categories=df["languages"].value_counts(ascending=True).index,
     ).codes
 
     layout = go.Layout(
         scene=dict(
             xaxis=dict(visible=False),
             yaxis=dict(visible=False),
-            zaxis=dict(visible=False)
+            zaxis=dict(visible=False),
         )
     )
 
     scatter = go.Scatter3d(
-        x=embedded[:, 0], y=embedded[:, 1], z=embedded[:, 2],
-        customdata=df['languages_list'],
+        x=embedded[:, 0],
+        y=embedded[:, 1],
+        z=embedded[:, 2],
+        customdata=df["languages_list"],
         hovertemplate="%{customdata}",
-        mode='markers+text',
-        marker=dict(
-            color=targets,
-            colorscale='Jet',
-            size=2
-        )
+        mode="markers+text",
+        marker=dict(color=targets, colorscale="Jet", size=2),
     )
 
     fig = go.Figure(data=scatter, layout=layout)

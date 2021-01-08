@@ -4,15 +4,21 @@ import dash_html_components as html
 from apps.database.callbacks import update_timeline
 from apps.layouts import emptyrow, header
 
-graphs = html.Div([
-    dcc.Graph(id='fig-timeline', figure=update_timeline()),
-], className='col')
+graphs = html.Div(
+    [
+        dcc.Graph(id="fig-timeline", figure=update_timeline()),
+    ],
+    className="col",
+)
 
-layout = html.Div([
-    header,
-    emptyrow,
-    graphs,
-], className='container')
+layout = html.Div(
+    [
+        header,
+        emptyrow,
+        graphs,
+    ],
+    className="container",
+)
 
 # html.Div(children=[
 #     html.H1(children=),
