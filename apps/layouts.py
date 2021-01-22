@@ -1,23 +1,9 @@
-import dash_core_components as dcc
-import dash_html_components as html
+import dash_bootstrap_components as dbc
 
-emptyrow = html.Div(
-    [html.Div([html.Br()], className="col")],
-    className="row",
-    style={"height": "50px"},
-)
-
-header = html.Div(
-    [
-        html.Div(
-            [
-                html.H1(
-                    children="Exploring the EUvsDisinfo database",
-                    style={"textAlign": "center"},
-                )
-            ],
-            className="col",
-        ),
+header = dbc.NavbarSimple(
+    children=[
+        dbc.NavItem(dbc.NavLink("Visualisation", href="/database")),
+        dbc.NavItem(dbc.NavLink("Analysis", href="/publications")),
     ],
-    className="row",
+    brand="Exploring the EUvsDisinfo database",
 )

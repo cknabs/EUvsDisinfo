@@ -1,20 +1,19 @@
+import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 
 from apps.database.callbacks import update_timeline
-from apps.layouts import emptyrow, header
+from apps.layouts import header
 
-graphs = html.Div(
-    [
+graphs = dbc.Col(
+    children=[
         dcc.Graph(id="fig-timeline", figure=update_timeline()),
     ],
-    className="col",
 )
 
 layout = html.Div(
     [
         header,
-        emptyrow,
         graphs,
     ],
     className="container",
