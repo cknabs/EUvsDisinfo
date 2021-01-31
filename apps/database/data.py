@@ -3,13 +3,13 @@ import pandas as pd
 from apps.util import explode_replace
 
 # Data
-cols = ["date", "countries", "languages", "keywords"]
+cols = ["id", "title", "date", "languages"]
 dtypes = {c: "string" for c in cols}
 df = pd.read_csv("data/posts.csv", usecols=cols, dtype=dtypes).fillna("")
+df["date"] = pd.to_datetime(df["date"])
+df = explode_replace(df, "languages", "language")
 
-date_language = df[["date", "languages"]]
-date_language["date"] = pd.to_datetime(date_language["date"])
-date_language = explode_replace(date_language, "languages", "language")
+date_language = df[["date", "language"]][:100]
 date_language = pd.pivot_table(
     date_language,
     index=["date"],
@@ -19,3 +19,5 @@ date_language = pd.pivot_table(
 date_language.rename(columns={"": "Other"}, inplace=True)
 date_language.index.rename("date", inplace=True)
 date_language.fillna(0, inplace=True)
+
+df.index = df["date"]

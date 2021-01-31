@@ -1,7 +1,13 @@
+from datetime import datetime
+
+import dash_bootstrap_components as dbc
+import dash_html_components as html
 import pandas as pd
+from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 
-from apps.database.data import date_language
+from app import app
+from apps.database.data import date_language, df
 
 
 # @app.callback(
@@ -40,7 +46,15 @@ def update_timeline():
             visible=True if col in top else "legendonly",
             name=col,
             customdata=pd.concat(
-                [date_language.index.to_series(), date_language[col]], axis=1
+                [
+                    date_language.index.to_series(),
+                    date_language[col],
+                    pd.Series(
+                        [col] * len(date_language.index),
+                        index=date_language.index,
+                    ),
+                ],
+                axis=1,
             ),
             hovertemplate="%{customdata[0]|%Y-%m-%d}: %{customdata[1]}",
         )
@@ -64,3 +78,52 @@ def update_timeline():
     fig.update_xaxes(rangeslider_visible=True)
 
     return fig
+
+
+@app.callback(
+    Output("selected-entries", "children"),
+    [Input("fig-timeline", "clickData")],
+)
+def update_selected_entries(click_data):
+    if click_data is None:
+        return ""
+    point = click_data["points"][0]
+    date, num_entries, language = point["customdata"]
+    entries = df.loc[date]  # entries from same day
+    entries = entries[
+        entries["language"] == language
+    ]  # entries with same language
+    entries["link"] = entries.apply(
+        lambda x: html.A(x["title"], href=x["id"]), axis=1
+    )
+
+    date_obj = datetime.fromisoformat(date)
+    table_header = [
+        html.Thead(
+            html.Tr(
+                html.Th(
+                    [
+                        dbc.Badge(num_entries),
+                        " entries in ",
+                        dbc.Badge(language),
+                        " for ",
+                        dbc.Badge(date_obj.strftime("%h %d, %Y")),
+                    ]
+                )
+            )
+        )
+    ]
+    table_body = [
+        html.Tbody(
+            [
+                html.Tr(html.Td(html.A(title, href=entry_id)))
+                for title, entry_id in zip(entries["title"], entries["id"])
+            ]
+        )
+    ]
+    return dbc.Table(
+        table_header + table_body,
+        hover=True,
+        responsive=True,
+        striped=True,
+    )

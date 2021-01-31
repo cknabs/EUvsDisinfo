@@ -7,6 +7,7 @@ from apps.layouts import header
 
 graphs = dbc.Col(
     children=[
+        html.Div(id="selected-entries"),
         dcc.Graph(id="fig-timeline", figure=update_timeline()),
     ],
 )
