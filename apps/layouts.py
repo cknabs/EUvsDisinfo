@@ -17,6 +17,8 @@ inner.insert(pos_max, "[+]")
 
 datalegreya = f"{{{min_x}}}{''.join(inner)}{{{max_x}}}[{max_y}[{min_y}]"
 
+padding_style = {"padding-left": "5%", "padding-right": "5%"}
+
 title = [
     "Exploring the ",
     html.Span(
@@ -25,10 +27,24 @@ title = [
     " database",
 ]
 header = dbc.NavbarSimple(
-    children=[
-        dbc.NavItem(dbc.NavLink("Visualisation", href="/database")),
-        dbc.NavItem(dbc.NavLink("Analysis", href="/publications")),
-    ],
+    dbc.Nav(
+        children=[
+            dbc.NavItem(
+                dbc.NavLink(
+                    "Visualization", href="/visualization", active="partial"
+                )
+            ),
+            dbc.NavItem(
+                dbc.NavLink("Analysis", href="/analysis", active="partial")
+            ),
+        ],
+        pills=True,
+        navbar=True,
+    ),
     brand=datalegreya,  # "Exploring the EUvsDisinfo database",
     brand_style={"font-family": "Datalegreya-Gradient", "font-size": "400%"},
+    fluid=True,
+    style=padding_style,
 )
+
+empty_line = dbc.Row(style={"height": "2rem"})

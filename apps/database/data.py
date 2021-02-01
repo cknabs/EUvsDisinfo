@@ -9,7 +9,7 @@ df = pd.read_csv("data/posts.csv", usecols=cols, dtype=dtypes).fillna("")
 df["date"] = pd.to_datetime(df["date"])
 df = explode_replace(df, "languages", "language")
 
-date_language = df[["date", "language"]][:100]
+date_language = df[["date", "language"]]
 date_language = pd.pivot_table(
     date_language,
     index=["date"],

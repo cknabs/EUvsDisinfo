@@ -16,9 +16,11 @@ app.layout = html.Div(
 # Load page dynamically
 @app.callback(Output("page-content", "children"), Input("url", "pathname"))
 def display_page(pathname):
-    if pathname == "/database" or pathname == "/":
+    if pathname == "/":
+        return "TODO"
+    if pathname == "/visualization":
         return apps.database.layout
-    elif pathname == "/publications":
+    elif pathname == "/analysis":
         return apps.publications.layout
     else:
         return "404"
