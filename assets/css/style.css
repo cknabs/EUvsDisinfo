@@ -31,3 +31,25 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+
+.navbar-brand {
+    font-family: Datalegreya-Gradient, sans-serif;
+    font-size: 400%;
+}
+
+.empty-row {
+    height: 2rem;
+}
+
+.custom-container {
+    padding-left: 5%;
+    padding-right: 5%;
+}
+
+#db-table .badge {
+    font-size: 100%
+}
+
+#fig-timeline {
+    height: 100vh
+}

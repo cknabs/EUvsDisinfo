@@ -1,5 +1,4 @@
 import dash_bootstrap_components as dbc
-import dash_html_components as html
 
 # TODO: generate the following from the actual data
 vals = [0, 2, 1, 2, 1, 2, 2, 1, 2, 2, 3, 2, 3]
@@ -19,13 +18,6 @@ datalegreya = f"{{{min_x}}}{''.join(inner)}{{{max_x}}}[{max_y}[{min_y}]"
 
 padding_style = {"padding-left": "5%", "padding-right": "5%"}
 
-title = [
-    "Exploring the ",
-    html.Span(
-        children=datalegreya, style={"font-size": "200%", "padding": "0.25em"}
-    ),
-    " database",
-]
 header = dbc.NavbarSimple(
     dbc.Nav(
         children=[
@@ -41,10 +33,9 @@ header = dbc.NavbarSimple(
         pills=True,
         navbar=True,
     ),
-    brand=datalegreya,  # "Exploring the EUvsDisinfo database",
-    brand_style={"font-family": "Datalegreya-Gradient", "font-size": "400%"},
+    brand=datalegreya,
     fluid=True,
-    style=padding_style,
+    className="custom-container"
 )
 
-empty_line = dbc.Row(style={"height": "2rem"})
+empty_line = dbc.Row(className='empty-row')

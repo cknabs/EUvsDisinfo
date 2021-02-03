@@ -3,7 +3,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 
 from apps.database.callbacks import update_timeline
-from apps.layouts import empty_line, header, padding_style
+from apps.layouts import empty_line, header
 
 table_header = [
     html.Thead(
@@ -12,15 +12,14 @@ table_header = [
                 [
                     dbc.Badge(
                         id="timeline-th-num_entries",
-                        style={"font-size": "100%"},
                     ),
                     " entries in ",
                     dbc.Badge(
-                        id="timeline-th-language", style={"font-size": "100%"}
+                        id="timeline-th-language",
                     ),
                     " for ",
                     dbc.Badge(
-                        id="timeline-th-date", style={"font-size": "100%"}
+                        id="timeline-th-date",
                     ),
                 ]
             )
@@ -36,7 +35,6 @@ graphs = dbc.Row(
             dcc.Graph(
                 id="fig-timeline",
                 figure=update_timeline(),
-                style={"height": "100vh"},
             ),
             width=8,
         ),
@@ -46,6 +44,7 @@ graphs = dbc.Row(
                 hover=True,
                 responsive=True,
                 striped=True,
+                id='db-table'
             )
         ),
     ],
@@ -53,7 +52,7 @@ graphs = dbc.Row(
 
 layout = [
     header,
-    dbc.Container([empty_line, graphs], fluid=True, style=padding_style),
+    dbc.Container([empty_line, graphs], fluid=True, className="custom-container"),
 ]
 
 # html.Div(children=[

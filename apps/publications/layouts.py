@@ -26,11 +26,11 @@ graphs = dbc.Col(
     [dcc.Graph(id="fig-social"), dcc.Graph(id="fig-publishers")],
 )
 
-layout = html.Div(
-    [
-        header,
-        slider,
-        graphs,
-    ],
-    className="container",
-)
+layout = [
+    header,
+    dbc.Container(
+        [
+            slider,
+            graphs
+        ], className="custom-container")
+]
