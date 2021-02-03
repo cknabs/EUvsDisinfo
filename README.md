@@ -1,5 +1,5 @@
-![CI](https://github.com/cknabs/eu-vs-disinfo/workflows/CI/badge.svg)
-[![Requirements Status](https://requires.io/github/cknabs/eu-vs-disinfo/requirements.svg?branch=master)](https://requires.io/github/cknabs/eu-vs-disinfo/requirements/?branch=master)
+![CI](https://github.com/cknabs/EUvsDisinfo/workflows/CI/badge.svg)
+[![Requirements Status](https://requires.io/github/cknabs/EUvsDisinfo/requirements.svg?branch=master)](https://requires.io/github/cknabs/EUvsDisinfo/requirements/?branch=master)
 
 # euvsdisinfo-py
 
