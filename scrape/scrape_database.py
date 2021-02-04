@@ -56,28 +56,32 @@ class Entry:
             self.title = title_link.contents[0].strip()
             self.id = title_link["href"]
 
-            self.outlets = [
-                o.strip()
-                for o in self.get_data_column(entry, "Outlets")
-                .contents[0]
-                .split(",")
-            ]
-            self.countries = [
-                c.strip()
-                for c in self.get_data_column(entry, "Country")
-                .contents[0]
-                .split(",")
-            ]
+            self.outlets = self.get_strings_for_col(entry, "Outlets")
+            self.countries = self.get_strings_for_col(
+                entry, "Country", separator=","
+            )
         except Exception as exception:
             raise MalformedDataError(
                 "Malformed entry error", self.id
             ) from exception
 
-    @staticmethod
-    def get_data_column(soup: BeautifulSoup, data_col):
+    @classmethod
+    def get_data_column(cls, soup: BeautifulSoup, data_col):
         data_columns = soup.find_all(None, attrs={"data-column": data_col})
         assert len(data_columns) == 1
         return data_columns[0]
+
+    @classmethod
+    def get_strings_for_col(
+        cls, soup: BeautifulSoup, col_name: str, separator=None
+    ) -> List[str]:
+        data_col = cls.get_data_column(soup, col_name)
+        strings = [str(s).strip() for s in data_col.strings]
+        if separator is not None:
+            strings = [
+                s.strip() for lst in strings for s in lst.split(separator)
+            ]
+        return [s for s in strings if len(s) > 0]
 
 
 class Report:
