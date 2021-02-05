@@ -1,16 +1,19 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
 import argparse
 import logging
+import urllib.parse
 from csv import DictWriter
 from datetime import date, datetime
 from itertools import islice
 from multiprocessing import Pool
 from typing import Generator, List, Tuple, Union
 
+import requests
 import requests as req
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-from util import check_non_negative, list2str
+
+from util import LIST_SEPARATOR, check_non_negative, list2str
 
 URL = "https://euvsdisinfo.eu/disinformation-cases"
 LOGGER = logging.getLogger(__name__)
@@ -35,8 +38,8 @@ def get_total_entries() -> int:
     soup = BeautifulSoup(html.text, "html.parser")
     return int(
         soup.find(attrs={"class": "disinfo-db-results"})
-        .find("span")
-        .contents[0]
+            .find("span")
+            .contents[0]
     )
 
 
@@ -73,7 +76,7 @@ class Entry:
 
     @classmethod
     def get_strings_for_col(
-        cls, soup: BeautifulSoup, col_name: str, separator=None
+            cls, soup: BeautifulSoup, col_name: str, separator=None
     ) -> List[str]:
         data_col = cls.get_data_column(soup, col_name)
         strings = [str(s).strip() for s in data_col.strings]
@@ -90,6 +93,10 @@ class Report:
     keywords: List[str] = []
     summary: str = ""
     disproof: str = ""
+    summary_links: List[str] = []
+    summary_links_resolved: List[str] = []
+    disproof_links: List[str] = []
+    disproof_links_resolved: List[str] = []
     languages: List[str] = []
     publications: List[Tuple[str, str]] = []
 
@@ -111,15 +118,23 @@ class Report:
             except AttributeError:
                 self.warn_missing("keywords")
             try:
-                self.summary = report.find(
+                summary_container = report.find(
                     attrs={"class": "b-report__summary-text"}
-                ).text.strip()
+                )
+                self.summary = summary_container.text.strip()
+                links = [a["href"] for a in summary_container.find_all('a')]
+                self.summary_links = [self.url_encode(link) for link in links]
+                self.summary_links_resolved = [self.url_encode(self.resolve_link(link)) for link in links]
             except AttributeError:
                 self.warn_missing("summary")
             try:
-                self.disproof = report.find(
+                disproof_container = report.find(
                     attrs={"class": "b-report__disproof-text"}
-                ).text.strip()
+                )
+                self.disproof = disproof_container.text.strip()
+                links = [a["href"] for a in disproof_container.find_all('a')]
+                self.disproof_links = [self.url_encode(link) for link in links]
+                self.disproof_links_resolved = [self.url_encode(self.resolve_link(link)) for link in links]
             except AttributeError:
                 self.warn_missing("disproof")
         except Exception as exception:
@@ -154,6 +169,21 @@ class Report:
     def warn_missing(self, name: str):
         LOGGER.warning(f"Missing data '{name}' for {self.id}")
 
+    @staticmethod
+    def resolve_link(url: str) -> str:
+        try:
+            response = requests.head(url, allow_redirects=True)
+            if response.status_code == 200:
+                return response.url
+            else:
+                return str(response.status_code)
+        except requests.exceptions.RequestException as e:
+            return type(e).__name__
+
+    @staticmethod
+    def url_encode(url: str) -> str:
+        return urllib.parse.quote(url)
+
 
 class MalformedDataError(Exception):
     def __init__(self, message: str, id_: str):
@@ -184,7 +214,7 @@ def get_report(entry: Entry) -> Union[Report, None]:
 
 
 def extract(
-    entries_html, posts_out, annotations_out, publications_out, n_jobs
+        entries_html, posts_out, annotations_out, publications_out, n_jobs
 ):
     post_keys = [
         "date",
@@ -195,7 +225,9 @@ def extract(
         "languages",
         "outlets",
     ]
-    annotation_keys = ["id", "summary", "disproof"]
+    annotation_keys = ["id", "summary", "disproof",
+                       "summary-links", "summary-links-resolved",
+                       "disproof-links", "disproof-links-resolved"]
     publication_keys = ["id", "publication", "archive"]
 
     posts_writer = DictWriter(posts_out, post_keys)
@@ -209,7 +241,7 @@ def extract(
     entries = filter(lambda o: o is not None, map(get_entry, entries_html))
 
     for report in filter(
-        lambda o: o is not None, pool.imap(get_report, entries)
+            lambda o: o is not None, pool.imap(get_report, entries)
     ):
         entry = report.entry
 
@@ -230,6 +262,10 @@ def extract(
                 "id": report.id,
                 "summary": report.summary,
                 "disproof": report.disproof,
+                "summary-links": list2str(report.summary_links),
+                "summary-links-resolved": list2str(report.summary_links_resolved),
+                "disproof-links": list2str(report.disproof_links),
+                "disproof-links-resolved": list2str(report.disproof_links_resolved)
             }
         )
 
@@ -244,6 +280,9 @@ def extract(
 
 
 if __name__ == "__main__":
+    # Ensure lists of links can be encoded correctly
+    assert Report.url_encode(LIST_SEPARATOR) != LIST_SEPARATOR
+
     parser = argparse.ArgumentParser(
         description="Scrape entries listed in the euvsdisinfo.eu database. "
     )
