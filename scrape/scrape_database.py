@@ -1,6 +1,7 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
 import argparse
 import logging
+import urllib.error
 import urllib.parse
 from csv import DictWriter
 from datetime import date, datetime
@@ -185,7 +186,10 @@ class Report:
 
     @staticmethod
     def url_encode(url: str) -> str:
-        return urllib.parse.quote(url)
+        try:
+            return urllib.parse.quote(url)
+        except urllib.error.URLError as e:
+            return type(e).__name__
 
 
 class MalformedDataError(Exception):
