@@ -1,16 +1,20 @@
 # Scrape the euvsdisinfo.eu database and produce a .json of the entries
 import argparse
 import logging
+import urllib.error
+import urllib.parse
 from csv import DictWriter
 from datetime import date, datetime
 from itertools import islice
 from multiprocessing import Pool
 from typing import Generator, List, Tuple, Union
 
+import requests
 import requests as req
+import urllib3
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-from util import check_non_negative, list2str
+from util import LIST_SEPARATOR, check_non_negative, list2str
 
 URL = "https://euvsdisinfo.eu/disinformation-cases"
 LOGGER = logging.getLogger(__name__)
@@ -56,28 +60,32 @@ class Entry:
             self.title = title_link.contents[0].strip()
             self.id = title_link["href"]
 
-            self.outlets = [
-                o.strip()
-                for o in self.get_data_column(entry, "Outlets")
-                .contents[0]
-                .split(",")
-            ]
-            self.countries = [
-                c.strip()
-                for c in self.get_data_column(entry, "Country")
-                .contents[0]
-                .split(",")
-            ]
+            self.outlets = self.get_strings_for_col(entry, "Outlets")
+            self.countries = self.get_strings_for_col(
+                entry, "Country", separator=","
+            )
         except Exception as exception:
             raise MalformedDataError(
                 "Malformed entry error", self.id
             ) from exception
 
-    @staticmethod
-    def get_data_column(soup: BeautifulSoup, data_col):
+    @classmethod
+    def get_data_column(cls, soup: BeautifulSoup, data_col):
         data_columns = soup.find_all(None, attrs={"data-column": data_col})
         assert len(data_columns) == 1
         return data_columns[0]
+
+    @classmethod
+    def get_strings_for_col(
+        cls, soup: BeautifulSoup, col_name: str, separator=None
+    ) -> List[str]:
+        data_col = cls.get_data_column(soup, col_name)
+        strings = [str(s).strip() for s in data_col.strings]
+        if separator is not None:
+            strings = [
+                s.strip() for lst in strings for s in lst.split(separator)
+            ]
+        return [s for s in strings if len(s) > 0]
 
 
 class Report:
@@ -86,6 +94,10 @@ class Report:
     keywords: List[str] = []
     summary: str = ""
     disproof: str = ""
+    summary_links: List[str] = []
+    summary_links_resolved: List[str] = []
+    disproof_links: List[str] = []
+    disproof_links_resolved: List[str] = []
     languages: List[str] = []
     publications: List[Tuple[str, str]] = []
 
@@ -107,15 +119,27 @@ class Report:
             except AttributeError:
                 self.warn_missing("keywords")
             try:
-                self.summary = report.find(
+                summary_container = report.find(
                     attrs={"class": "b-report__summary-text"}
-                ).text.strip()
+                )
+                self.summary = summary_container.text.strip()
+                links = [a["href"] for a in summary_container.find_all("a")]
+                self.summary_links = [self.url_encode(link) for link in links]
+                self.summary_links_resolved = [
+                    self.url_encode(self.resolve_link(link)) for link in links
+                ]
             except AttributeError:
                 self.warn_missing("summary")
             try:
-                self.disproof = report.find(
+                disproof_container = report.find(
                     attrs={"class": "b-report__disproof-text"}
-                ).text.strip()
+                )
+                self.disproof = disproof_container.text.strip()
+                links = [a["href"] for a in disproof_container.find_all("a")]
+                self.disproof_links = [self.url_encode(link) for link in links]
+                self.disproof_links_resolved = [
+                    self.url_encode(self.resolve_link(link)) for link in links
+                ]
             except AttributeError:
                 self.warn_missing("disproof")
         except Exception as exception:
@@ -150,6 +174,28 @@ class Report:
     def warn_missing(self, name: str):
         LOGGER.warning(f"Missing data '{name}' for {self.id}")
 
+    @staticmethod
+    def resolve_link(url: str) -> str:
+        try:
+            response = requests.head(url, allow_redirects=True)
+            if response.status_code == 200:
+                return response.url
+            else:
+                return str(response.status_code)
+        except (
+            urllib3.exceptions.HTTPError,
+            requests.exceptions.RequestException,
+        ) as e:
+            # urllib3.exceptions.HTTPError needs to be caught, see https://github.com/psf/requests/issues/5744
+            return type(e).__name__
+
+    @staticmethod
+    def url_encode(url: str) -> str:
+        try:
+            return urllib.parse.quote(url)
+        except urllib.error.URLError as e:
+            return type(e).__name__
+
 
 class MalformedDataError(Exception):
     def __init__(self, message: str, id_: str):
@@ -180,7 +226,13 @@ def get_report(entry: Entry) -> Union[Report, None]:
 
 
 def extract(
-    entries_html, posts_out, annotations_out, publications_out, n_jobs
+    entries_html,
+    posts_out,
+    annotations_out,
+    publications_out,
+    n_jobs,
+    progress_entries,
+    progress_reports,
 ):
     post_keys = [
         "date",
@@ -191,7 +243,15 @@ def extract(
         "languages",
         "outlets",
     ]
-    annotation_keys = ["id", "summary", "disproof"]
+    annotation_keys = [
+        "id",
+        "summary",
+        "disproof",
+        "summary-links",
+        "summary-links-resolved",
+        "disproof-links",
+        "disproof-links-resolved",
+    ]
     publication_keys = ["id", "publication", "archive"]
 
     posts_writer = DictWriter(posts_out, post_keys)
@@ -201,45 +261,58 @@ def extract(
     publications_writer = DictWriter(publications_out, publication_keys)
     publications_writer.writeheader()
 
-    pool = Pool(n_jobs)
-    entries = filter(lambda o: o is not None, map(get_entry, entries_html))
-
-    for report in filter(
-        lambda o: o is not None, pool.imap(get_report, entries)
-    ):
-        entry = report.entry
-
-        posts_writer.writerow(
-            {
-                "date": entry.date,
-                "id": entry.id,
-                "title": entry.title,
-                "countries": list2str(entry.countries),
-                "keywords": list2str(report.keywords),
-                "languages": list2str(report.languages),
-                "outlets": list2str(entry.outlets),
-            }
+    with Pool(n_jobs) as pool:
+        entries = progress_entries(
+            o for o in map(get_entry, entries_html) if o is not None
         )
 
-        annotations_writer.writerow(
-            {
-                "id": report.id,
-                "summary": report.summary,
-                "disproof": report.disproof,
-            }
-        )
+        for report in progress_reports(
+            o for o in pool.imap(get_report, entries) if o is not None
+        ):
+            entry = report.entry
 
-        for link, archived_link in report.publications:
-            publications_writer.writerow(
+            posts_writer.writerow(
                 {
-                    "id": report.id,
-                    "publication": link,
-                    "archive": archived_link,
+                    "date": entry.date,
+                    "id": entry.id,
+                    "title": entry.title,
+                    "countries": list2str(entry.countries),
+                    "keywords": list2str(report.keywords),
+                    "languages": list2str(report.languages),
+                    "outlets": list2str(entry.outlets),
                 }
             )
 
+            annotations_writer.writerow(
+                {
+                    "id": report.id,
+                    "summary": report.summary,
+                    "disproof": report.disproof,
+                    "summary-links": list2str(report.summary_links),
+                    "summary-links-resolved": list2str(
+                        report.summary_links_resolved
+                    ),
+                    "disproof-links": list2str(report.disproof_links),
+                    "disproof-links-resolved": list2str(
+                        report.disproof_links_resolved
+                    ),
+                }
+            )
+
+            for link, archived_link in report.publications:
+                publications_writer.writerow(
+                    {
+                        "id": report.id,
+                        "publication": link,
+                        "archive": archived_link,
+                    }
+                )
+
 
 if __name__ == "__main__":
+    # Ensure lists of links can be encoded correctly
+    assert Report.url_encode(LIST_SEPARATOR) != LIST_SEPARATOR
+
     parser = argparse.ArgumentParser(
         description="Scrape entries listed in the euvsdisinfo.eu database. "
     )
@@ -321,11 +394,18 @@ if __name__ == "__main__":
     with args.posts as posts_file, args.annotations as annotations_file, args.publications as publications_file:
 
         iterator = islice(all_entries(), args.lines)
-        if args.show_progress:
-            total_entries = (
-                get_total_entries() if args.lines is None else args.lines
-            )
-            iterator = tqdm(iterator, total=total_entries)
+
+        total_entries = (
+            get_total_entries() if args.lines is None else args.lines
+        )
+        chars_needed = str(len(str(total_entries)))
+        bar_format = (
+            "{l_bar}{bar}|{n_fmt:>"
+            + chars_needed
+            + "}/{total_fmt:>"
+            + chars_needed
+            + "} "
+        )
 
         extract(
             iterator,
@@ -333,4 +413,22 @@ if __name__ == "__main__":
             annotations_out=annotations_file,
             publications_out=publications_file,
             n_jobs=args.jobs,
+            progress_entries=lambda it: tqdm(
+                it,
+                desc="Entries  ",
+                total=total_entries,
+                colour="yellow",
+                position=0,
+                disable=not args.show_progress,
+                bar_format=bar_format,
+            ),
+            progress_reports=lambda it: tqdm(
+                it,
+                desc="╰╴Reports",
+                total=total_entries,
+                colour="green",
+                position=1,
+                disable=not args.show_progress,
+                bar_format=bar_format,
+            ),
         )

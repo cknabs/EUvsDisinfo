@@ -32,6 +32,8 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* General */
+
 .navbar-brand {
     font-family: Datalegreya-Gradient, sans-serif;
     font-size: 400%;
@@ -46,10 +48,25 @@ body {
     padding-right: 5%;
 }
 
-#db-table .badge {
-    font-size: 100%
-}
+/* Visualization */
 
 #fig-timeline {
     height: 100vh
 }
+
+#col-db-table .table-responsive {
+    height: 100vh;
+    overflow-y: scroll;
+}
+
+#col-db-table th {
+    position: sticky;
+    top: 0;
+    background-color: white; /* set bg to fully opaque color, so that entries are hidden underneath when scrolling */
+}
+
+#col-db-table .badge {
+    font-size: 100%
+}
+
+/* Analysis */

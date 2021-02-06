@@ -44,15 +44,17 @@ graphs = dbc.Row(
                 hover=True,
                 responsive=True,
                 striped=True,
-                id='db-table'
-            )
+            ),
+            id="col-db-table",
         ),
     ],
 )
 
 layout = [
     header,
-    dbc.Container([empty_line, graphs], fluid=True, className="custom-container"),
+    dbc.Container(
+        [empty_line, graphs], fluid=True, className="custom-container"
+    ),
 ]
 
 # html.Div(children=[
