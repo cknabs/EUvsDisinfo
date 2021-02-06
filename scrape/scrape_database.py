@@ -182,9 +182,11 @@ class Report:
                 return response.url
             else:
                 return str(response.status_code)
-        except urllib3.exceptions.HTTPError as e:  # https://github.com/psf/requests/issues/5744
-            return type(e).__name__
-        except requests.exceptions.RequestException as e:
+        except (
+            urllib3.exceptions.HTTPError,
+            requests.exceptions.RequestException,
+        ) as e:
+            # urllib3.exceptions.HTTPError needs to be caught, see https://github.com/psf/requests/issues/5744
             return type(e).__name__
 
     @staticmethod
@@ -261,11 +263,11 @@ def extract(
 
     with Pool(n_jobs) as pool:
         entries = progress_entries(
-            filter(lambda o: o is not None, map(get_entry, entries_html))
+            o for o in map(get_entry, entries_html) if o is not None
         )
 
         for report in progress_reports(
-            filter(lambda o: o is not None, pool.imap(get_report, entries))
+            o for o in pool.imap(get_report, entries) if o is not None
         ):
             entry = report.entry
 
