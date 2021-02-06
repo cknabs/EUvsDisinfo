@@ -12,7 +12,6 @@ import requests
 import requests as req
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-
 from util import LIST_SEPARATOR, check_non_negative, list2str
 
 URL = "https://euvsdisinfo.eu/disinformation-cases"
@@ -38,8 +37,8 @@ def get_total_entries() -> int:
     soup = BeautifulSoup(html.text, "html.parser")
     return int(
         soup.find(attrs={"class": "disinfo-db-results"})
-            .find("span")
-            .contents[0]
+        .find("span")
+        .contents[0]
     )
 
 
@@ -76,7 +75,7 @@ class Entry:
 
     @classmethod
     def get_strings_for_col(
-            cls, soup: BeautifulSoup, col_name: str, separator=None
+        cls, soup: BeautifulSoup, col_name: str, separator=None
     ) -> List[str]:
         data_col = cls.get_data_column(soup, col_name)
         strings = [str(s).strip() for s in data_col.strings]
@@ -122,9 +121,11 @@ class Report:
                     attrs={"class": "b-report__summary-text"}
                 )
                 self.summary = summary_container.text.strip()
-                links = [a["href"] for a in summary_container.find_all('a')]
+                links = [a["href"] for a in summary_container.find_all("a")]
                 self.summary_links = [self.url_encode(link) for link in links]
-                self.summary_links_resolved = [self.url_encode(self.resolve_link(link)) for link in links]
+                self.summary_links_resolved = [
+                    self.url_encode(self.resolve_link(link)) for link in links
+                ]
             except AttributeError:
                 self.warn_missing("summary")
             try:
@@ -132,9 +133,11 @@ class Report:
                     attrs={"class": "b-report__disproof-text"}
                 )
                 self.disproof = disproof_container.text.strip()
-                links = [a["href"] for a in disproof_container.find_all('a')]
+                links = [a["href"] for a in disproof_container.find_all("a")]
                 self.disproof_links = [self.url_encode(link) for link in links]
-                self.disproof_links_resolved = [self.url_encode(self.resolve_link(link)) for link in links]
+                self.disproof_links_resolved = [
+                    self.url_encode(self.resolve_link(link)) for link in links
+                ]
             except AttributeError:
                 self.warn_missing("disproof")
         except Exception as exception:
@@ -214,7 +217,13 @@ def get_report(entry: Entry) -> Union[Report, None]:
 
 
 def extract(
-        entries_html, posts_out, annotations_out, publications_out, n_jobs
+    entries_html,
+    posts_out,
+    annotations_out,
+    publications_out,
+    n_jobs,
+    progress_entries,
+    progress_reports,
 ):
     post_keys = [
         "date",
@@ -225,9 +234,15 @@ def extract(
         "languages",
         "outlets",
     ]
-    annotation_keys = ["id", "summary", "disproof",
-                       "summary-links", "summary-links-resolved",
-                       "disproof-links", "disproof-links-resolved"]
+    annotation_keys = [
+        "id",
+        "summary",
+        "disproof",
+        "summary-links",
+        "summary-links-resolved",
+        "disproof-links",
+        "disproof-links-resolved",
+    ]
     publication_keys = ["id", "publication", "archive"]
 
     posts_writer = DictWriter(posts_out, post_keys)
@@ -238,10 +253,12 @@ def extract(
     publications_writer.writeheader()
 
     pool = Pool(n_jobs)
-    entries = filter(lambda o: o is not None, map(get_entry, entries_html))
+    entries = progress_entries(
+        filter(lambda o: o is not None, map(get_entry, entries_html))
+    )
 
-    for report in filter(
-            lambda o: o is not None, pool.imap(get_report, entries)
+    for report in progress_reports(
+        filter(lambda o: o is not None, pool.imap(get_report, entries))
     ):
         entry = report.entry
 
@@ -263,9 +280,13 @@ def extract(
                 "summary": report.summary,
                 "disproof": report.disproof,
                 "summary-links": list2str(report.summary_links),
-                "summary-links-resolved": list2str(report.summary_links_resolved),
+                "summary-links-resolved": list2str(
+                    report.summary_links_resolved
+                ),
                 "disproof-links": list2str(report.disproof_links),
-                "disproof-links-resolved": list2str(report.disproof_links_resolved)
+                "disproof-links-resolved": list2str(
+                    report.disproof_links_resolved
+                ),
             }
         )
 
@@ -364,11 +385,18 @@ if __name__ == "__main__":
     with args.posts as posts_file, args.annotations as annotations_file, args.publications as publications_file:
 
         iterator = islice(all_entries(), args.lines)
-        if args.show_progress:
-            total_entries = (
-                get_total_entries() if args.lines is None else args.lines
-            )
-            iterator = tqdm(iterator, total=total_entries)
+
+        total_entries = (
+            get_total_entries() if args.lines is None else args.lines
+        )
+        chars_needed = str(len(str(total_entries)))
+        bar_format = (
+            "{l_bar}{bar}|{n_fmt:>"
+            + chars_needed
+            + "}/{total_fmt:>"
+            + chars_needed
+            + "} "
+        )
 
         extract(
             iterator,
@@ -376,4 +404,22 @@ if __name__ == "__main__":
             annotations_out=annotations_file,
             publications_out=publications_file,
             n_jobs=args.jobs,
+            progress_entries=lambda it: tqdm(
+                it,
+                desc="Entries  ",
+                total=total_entries,
+                colour="yellow",
+                position=0,
+                disable=not args.show_progress,
+                bar_format=bar_format,
+            ),
+            progress_reports=lambda it: tqdm(
+                it,
+                desc="╰╴Reports",
+                total=total_entries,
+                colour="green",
+                position=1,
+                disable=not args.show_progress,
+                bar_format=bar_format,
+            ),
         )
