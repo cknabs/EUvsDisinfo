@@ -11,6 +11,7 @@ from typing import Generator, List, Tuple, Union
 
 import requests
 import requests as req
+import urllib3
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from util import LIST_SEPARATOR, check_non_negative, list2str
@@ -181,6 +182,8 @@ class Report:
                 return response.url
             else:
                 return str(response.status_code)
+        except urllib3.exceptions.HTTPError as e:  # https://github.com/psf/requests/issues/5744
+            return type(e).__name__
         except requests.exceptions.RequestException as e:
             return type(e).__name__
 
