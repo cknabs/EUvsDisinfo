@@ -252,52 +252,52 @@ def extract(
     publications_writer = DictWriter(publications_out, publication_keys)
     publications_writer.writeheader()
 
-    pool = Pool(n_jobs)
-    entries = progress_entries(
-        filter(lambda o: o is not None, map(get_entry, entries_html))
-    )
-
-    for report in progress_reports(
-        filter(lambda o: o is not None, pool.imap(get_report, entries))
-    ):
-        entry = report.entry
-
-        posts_writer.writerow(
-            {
-                "date": entry.date,
-                "id": entry.id,
-                "title": entry.title,
-                "countries": list2str(entry.countries),
-                "keywords": list2str(report.keywords),
-                "languages": list2str(report.languages),
-                "outlets": list2str(entry.outlets),
-            }
+    with Pool(n_jobs) as pool:
+        entries = progress_entries(
+            filter(lambda o: o is not None, map(get_entry, entries_html))
         )
 
-        annotations_writer.writerow(
-            {
-                "id": report.id,
-                "summary": report.summary,
-                "disproof": report.disproof,
-                "summary-links": list2str(report.summary_links),
-                "summary-links-resolved": list2str(
-                    report.summary_links_resolved
-                ),
-                "disproof-links": list2str(report.disproof_links),
-                "disproof-links-resolved": list2str(
-                    report.disproof_links_resolved
-                ),
-            }
-        )
+        for report in progress_reports(
+            filter(lambda o: o is not None, pool.imap(get_report, entries))
+        ):
+            entry = report.entry
 
-        for link, archived_link in report.publications:
-            publications_writer.writerow(
+            posts_writer.writerow(
                 {
-                    "id": report.id,
-                    "publication": link,
-                    "archive": archived_link,
+                    "date": entry.date,
+                    "id": entry.id,
+                    "title": entry.title,
+                    "countries": list2str(entry.countries),
+                    "keywords": list2str(report.keywords),
+                    "languages": list2str(report.languages),
+                    "outlets": list2str(entry.outlets),
                 }
             )
+
+            annotations_writer.writerow(
+                {
+                    "id": report.id,
+                    "summary": report.summary,
+                    "disproof": report.disproof,
+                    "summary-links": list2str(report.summary_links),
+                    "summary-links-resolved": list2str(
+                        report.summary_links_resolved
+                    ),
+                    "disproof-links": list2str(report.disproof_links),
+                    "disproof-links-resolved": list2str(
+                        report.disproof_links_resolved
+                    ),
+                }
+            )
+
+            for link, archived_link in report.publications:
+                publications_writer.writerow(
+                    {
+                        "id": report.id,
+                        "publication": link,
+                        "archive": archived_link,
+                    }
+                )
 
 
 if __name__ == "__main__":
