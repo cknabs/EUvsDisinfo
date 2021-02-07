@@ -3,25 +3,52 @@ import argparse
 import logging
 import urllib.error
 import urllib.parse
+from collections import namedtuple
 from csv import DictWriter
 from datetime import date, datetime
 from itertools import islice
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Generator, List, Tuple, Union
+from typing import Generator, Iterator, List, Optional, Tuple
 
 import requests
 import requests as req
 import urllib3
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-from util import LIST_SEPARATOR, check_non_negative, list2str
+from util import LIST_SEPARATOR, check_non_negative, stringify
 
 URL = "https://euvsdisinfo.eu/disinformation-cases"
 LOGGER = logging.getLogger(__name__)
 POSTS_FILENAME = "posts.csv"
 PUBLICATIONS_FILENAME = "publications.csv"
 ANNOTATIONS_FILENAME = "annotations.csv"
+
+Post = namedtuple(
+    "Post",
+    [
+        "date",
+        "id",
+        "title",
+        "countries",
+        "keywords",
+        "languages",
+        "outlets",
+    ],
+)
+Annotation = namedtuple(
+    "Annotation",
+    [
+        "id",
+        "summary",
+        "disproof",
+        "summary_links",
+        "summary_links_resolved",
+        "disproof_links",
+        "disproof_links_resolved",
+    ],
+)
+Publication = namedtuple("Publication", ["id", "publication", "archive"])
 
 
 def all_entries() -> Generator:
@@ -207,7 +234,7 @@ class MalformedDataError(Exception):
         self.id = id_
 
 
-def get_entry(entry_html) -> Union[Entry, None]:
+def get_entry(entry_html) -> Optional[Entry]:
     """Wrapper for :class:`Entry` initialization, return None on error.
     Defined here to be picklable.
     """
@@ -218,7 +245,7 @@ def get_entry(entry_html) -> Union[Entry, None]:
     return None
 
 
-def get_report(entry: Entry) -> Union[Report, None]:
+def get_report(entry: Entry) -> Optional[Report]:
     """Wrapper for :class:`Report` initialization, return None on error.
     Defined here to be picklable.
     """
@@ -231,40 +258,10 @@ def get_report(entry: Entry) -> Union[Report, None]:
 
 def extract(
     entries_html,
-    posts_out,
-    annotations_out,
-    publications_out,
     n_jobs,
     progress_entries,
     progress_reports,
-):
-    post_keys = [
-        "date",
-        "id",
-        "title",
-        "countries",
-        "keywords",
-        "languages",
-        "outlets",
-    ]
-    annotation_keys = [
-        "id",
-        "summary",
-        "disproof",
-        "summary-links",
-        "summary-links-resolved",
-        "disproof-links",
-        "disproof-links-resolved",
-    ]
-    publication_keys = ["id", "publication", "archive"]
-
-    posts_writer = DictWriter(posts_out, post_keys)
-    posts_writer.writeheader()
-    annotations_writer = DictWriter(annotations_out, annotation_keys)
-    annotations_writer.writeheader()
-    publications_writer = DictWriter(publications_out, publication_keys)
-    publications_writer.writeheader()
-
+) -> Iterator[Tuple[Post, Annotation, List[Publication]]]:
     with Pool(n_jobs) as pool:
         entries = progress_entries(
             o for o in map(get_entry, entries_html) if o is not None
@@ -275,42 +272,63 @@ def extract(
         ):
             entry = report.entry
 
-            posts_writer.writerow(
-                {
-                    "date": entry.date,
-                    "id": entry.id,
-                    "title": entry.title,
-                    "countries": list2str(entry.countries),
-                    "keywords": list2str(report.keywords),
-                    "languages": list2str(report.languages),
-                    "outlets": list2str(entry.outlets),
-                }
+            post = Post(
+                date=entry.date,
+                id=entry.id,
+                title=entry.title,
+                countries=entry.countries,
+                keywords=report.keywords,
+                languages=report.languages,
+                outlets=entry.outlets,
             )
 
-            annotations_writer.writerow(
-                {
-                    "id": report.id,
-                    "summary": report.summary,
-                    "disproof": report.disproof,
-                    "summary-links": list2str(report.summary_links),
-                    "summary-links-resolved": list2str(
-                        report.summary_links_resolved
-                    ),
-                    "disproof-links": list2str(report.disproof_links),
-                    "disproof-links-resolved": list2str(
-                        report.disproof_links_resolved
-                    ),
-                }
+            annotation = Annotation(
+                id=report.id,
+                summary=report.summary,
+                disproof=report.disproof,
+                summary_links=report.summary_links,
+                summary_links_resolved=report.summary_links_resolved,
+                disproof_links=report.disproof_links,
+                disproof_links_resolved=report.disproof_links_resolved,
             )
 
-            for link, archived_link in report.publications:
-                publications_writer.writerow(
-                    {
-                        "id": report.id,
-                        "publication": link,
-                        "archive": archived_link,
-                    }
+            publications = [
+                Publication(
+                    id=report.id, publication=link, archive=archived_link
                 )
+                for link, archived_link in report.publications
+            ]
+            yield (post, annotation, publications)
+
+
+def write(
+    out_dir: Path, gen: Iterator[Tuple[Post, Annotation, List[Publication]]]
+):
+    mode = "w"
+    with open(out_dir / POSTS_FILENAME, mode) as posts_file, open(
+        out_dir / ANNOTATIONS_FILENAME, mode
+    ) as annotations_file, open(
+        out_dir / PUBLICATIONS_FILENAME, mode
+    ) as publications_file:
+        posts_writer = DictWriter(posts_file, Post._fields)
+        posts_writer.writeheader()
+        annotations_writer = DictWriter(annotations_file, Annotation._fields)
+        annotations_writer.writeheader()
+        publications_writer = DictWriter(
+            publications_file, Publication._fields
+        )
+        publications_writer.writeheader()
+
+        for post, annotation, publications in gen:
+            for publication in publications:
+                publications_writer.writerow(stringify(publication._asdict()))
+            publications_file.flush()
+
+            annotations_writer.writerow(stringify(annotation._asdict()))
+            annotations_file.flush()
+
+            posts_writer.writerow(stringify(post._asdict()))
+            posts_file.flush()
 
 
 if __name__ == "__main__":
@@ -324,7 +342,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "dir",
         metavar="DIR",
-        help="Output directory",
+        help="output directory",
         type=lambda p: Path(p).absolute(),
         default=Path(__file__).absolute().parent.parent / "data",
         nargs="?",
@@ -344,7 +362,7 @@ if __name__ == "__main__":
         metavar="N",
         help="number of jobs to use (default: %(default)s)",
         type=check_non_negative,
-        default=10,
+        default=16,
     )
 
     group = parser.add_argument_group("verbosity arguments")
@@ -386,48 +404,39 @@ if __name__ == "__main__":
     if not args.show_warnings:
         LOGGER.setLevel(logging.ERROR)
 
-    with open(args.dir / POSTS_FILENAME, "w") as posts_file, open(
-        args.dir / ANNOTATIONS_FILENAME, "w"
-    ) as annotations_file, open(
-        args.dir / PUBLICATIONS_FILENAME, "w"
-    ) as publications_file:
+    iterator = islice(all_entries(), args.lines)
 
-        iterator = islice(all_entries(), args.lines)
+    total_entries = get_total_entries() if args.lines is None else args.lines
+    chars_needed = str(len(str(total_entries)))
+    bar_format = (
+        "{l_bar}{bar}|{n_fmt:>"
+        + chars_needed
+        + "}/{total_fmt:>"
+        + chars_needed
+        + "} "
+    )
 
-        total_entries = (
-            get_total_entries() if args.lines is None else args.lines
-        )
-        chars_needed = str(len(str(total_entries)))
-        bar_format = (
-            "{l_bar}{bar}|{n_fmt:>"
-            + chars_needed
-            + "}/{total_fmt:>"
-            + chars_needed
-            + "} "
-        )
+    extracted = extract(
+        iterator,
+        n_jobs=args.jobs,
+        progress_entries=lambda it: tqdm(
+            it,
+            desc="Entries  ",
+            total=total_entries,
+            colour="yellow",
+            position=0,
+            disable=not args.show_progress,
+            bar_format=bar_format,
+        ),
+        progress_reports=lambda it: tqdm(
+            it,
+            desc="╰╴Reports",
+            total=total_entries,
+            colour="green",
+            position=1,
+            disable=not args.show_progress,
+            bar_format=bar_format,
+        ),
+    )
 
-        extract(
-            iterator,
-            posts_out=posts_file,
-            annotations_out=annotations_file,
-            publications_out=publications_file,
-            n_jobs=args.jobs,
-            progress_entries=lambda it: tqdm(
-                it,
-                desc="Entries  ",
-                total=total_entries,
-                colour="yellow",
-                position=0,
-                disable=not args.show_progress,
-                bar_format=bar_format,
-            ),
-            progress_reports=lambda it: tqdm(
-                it,
-                desc="╰╴Reports",
-                total=total_entries,
-                colour="green",
-                position=1,
-                disable=not args.show_progress,
-                bar_format=bar_format,
-            ),
-        )
+    write(args.dir, extracted)

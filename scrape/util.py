@@ -1,5 +1,5 @@
 import argparse
-from typing import List
+from typing import Any, Dict, List
 
 LIST_SEPARATOR: str = "+"
 
@@ -11,6 +11,21 @@ def list2str(lst: List[str]) -> str:
 
 def str2list(string: str) -> List[str]:
     return string.split(LIST_SEPARATOR)
+
+
+def to_string(val: Any) -> str:
+    if val is None:
+        return ""
+    elif isinstance(val, str):
+        return val
+    elif isinstance(val, list):
+        return list2str(val)
+    else:
+        return str(val)
+
+
+def stringify(dictionary: dict) -> Dict[str, str]:
+    return {k: to_string(v) for k, v in dictionary.items()}
 
 
 def check_non_negative(string: str) -> int:
