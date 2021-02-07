@@ -7,6 +7,7 @@ from csv import DictWriter
 from datetime import date, datetime
 from itertools import islice
 from multiprocessing import Pool
+from pathlib import Path
 from typing import Generator, List, Tuple, Union
 
 import requests
@@ -18,6 +19,9 @@ from util import LIST_SEPARATOR, check_non_negative, list2str
 
 URL = "https://euvsdisinfo.eu/disinformation-cases"
 LOGGER = logging.getLogger(__name__)
+POSTS_FILENAME = "posts.csv"
+PUBLICATIONS_FILENAME = "publications.csv"
+ANNOTATIONS_FILENAME = "annotations.csv"
 
 
 def all_entries() -> Generator:
@@ -316,23 +320,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Scrape entries listed in the euvsdisinfo.eu database. "
     )
+
     parser.add_argument(
-        "posts",
-        metavar="POSTS",
-        help="where to output the scraped posts",
-        type=argparse.FileType("w"),
-    )
-    parser.add_argument(
-        "annotations",
-        metavar="ANNOTATIONS",
-        help="where to output the scraped annotations",
-        type=argparse.FileType("w"),
-    )
-    parser.add_argument(
-        "publications",
-        metavar="PUBLICATIONS",
-        help="where to output the scraped publications list",
-        type=argparse.FileType("w"),
+        "dir",
+        metavar="DIR",
+        help="Output directory",
+        type=lambda p: Path(p).absolute(),
+        default=Path(__file__).absolute().parent.parent / "data",
+        nargs="?",
     )
 
     parser.add_argument(
@@ -391,7 +386,11 @@ if __name__ == "__main__":
     if not args.show_warnings:
         LOGGER.setLevel(logging.ERROR)
 
-    with args.posts as posts_file, args.annotations as annotations_file, args.publications as publications_file:
+    with open(args.dir / POSTS_FILENAME, "w") as posts_file, open(
+        args.dir / ANNOTATIONS_FILENAME, "w"
+    ) as annotations_file, open(
+        args.dir / PUBLICATIONS_FILENAME, "w"
+    ) as publications_file:
 
         iterator = islice(all_entries(), args.lines)
 
