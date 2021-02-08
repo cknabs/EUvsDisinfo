@@ -1,4 +1,3 @@
-# Scrape the euvsdisinfo.eu database and produce a .json of the entries
 import argparse
 import logging
 import urllib.error
@@ -9,8 +8,9 @@ from datetime import date, datetime
 from itertools import islice
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Generator, Iterator, List, Optional, Tuple
+from typing import Collection, Generator, Iterator, List, Optional, Tuple
 
+import pandas as pd
 import requests
 import requests as req
 import urllib3
@@ -51,8 +51,8 @@ Annotation = namedtuple(
 Publication = namedtuple("Publication", ["id", "publication", "archive"])
 
 
-def all_entries() -> Generator:
-    """Generator, yields all entries"""
+def all_rows() -> Generator:
+    """Generator, yields all rows"""
     offset = 0
     while True:
         html = req.get(URL, params={"offset": offset, "per_page": 100})
@@ -65,7 +65,7 @@ def all_entries() -> Generator:
             offset += 1
 
 
-def get_total_entries() -> int:
+def get_len_total_entries() -> int:
     html = req.get(URL)
     soup = BeautifulSoup(html.text, "html.parser")
     return int(
@@ -75,29 +75,29 @@ def get_total_entries() -> int:
     )
 
 
-class Entry:
+class Row:
     date: date
     title: str = ""
     id: str = ""
     outlets: List[str] = []
     countries: List[str] = []
 
-    def __init__(self, entry):
-        # Get basic data from database entry
+    def __init__(self, row):
+        # Get basic data from database row
         try:
-            date_str = self.get_data_column(entry, "Date").contents[0].strip()
+            date_str = self.get_data_column(row, "Date").contents[0].strip()
             self.date = datetime.strptime(date_str, "%d.%m.%Y").date()
-            title_link = self.get_data_column(entry, "Title").find("a")
+            title_link = self.get_data_column(row, "Title").find("a")
             self.title = title_link.contents[0].strip()
             self.id = title_link["href"]
 
-            self.outlets = self.get_strings_for_col(entry, "Outlets")
+            self.outlets = self.get_strings_for_col(row, "Outlets")
             self.countries = self.get_strings_for_col(
-                entry, "Country", separator=","
+                row, "Country", separator=","
             )
         except Exception as exception:
             raise MalformedDataError(
-                "Malformed entry error", self.id
+                "Malformed row error", self.id
             ) from exception
 
     @classmethod
@@ -120,7 +120,7 @@ class Entry:
 
 
 class Report:
-    entry: Entry
+    row: Row
     id: str = ""
     keywords: List[str] = []
     summary: str = ""
@@ -132,9 +132,9 @@ class Report:
     languages: List[str] = []
     publications: List[Tuple[str, str]] = []
 
-    def __init__(self, entry: Entry):
-        self.entry = entry
-        self.id = self.entry.id
+    def __init__(self, row: Row):
+        self.row = row
+        self.id = self.row.id
 
         # Get keywords, summary, disproof from report page
         try:
@@ -234,52 +234,60 @@ class MalformedDataError(Exception):
         self.id = id_
 
 
-def get_entry(entry_html) -> Optional[Entry]:
-    """Wrapper for :class:`Entry` initialization, return None on error.
+def get_row(row_html) -> Optional[Row]:
+    """Wrapper for :class:`Row` initialization, return None on error.
     Defined here to be picklable.
     """
     try:
-        return Entry(entry_html)
+        return Row(row_html)
     except MalformedDataError as mde:
         LOGGER.warning(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
     return None
 
 
-def get_report(entry: Entry) -> Optional[Report]:
+def get_report(row: Row) -> Optional[Report]:
     """Wrapper for :class:`Report` initialization, return None on error.
     Defined here to be picklable.
     """
     try:
-        return Report(entry)
+        return Report(row)
     except MalformedDataError as mde:
         LOGGER.warning(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
     return None
 
 
+def get_scraped_ids(out_dir: Path) -> Collection[str]:
+    read = pd.read_csv(out_dir / POSTS_FILENAME)
+    return set(read["id"])  # for efficient membership test
+
+
 def extract(
-    entries_html,
-    n_jobs,
-    progress_entries,
+    rows_html,
+    n_jobs: int,
+    ignore_ids: Collection[str],
+    progress_rows,
     progress_reports,
 ) -> Iterator[Tuple[Post, Annotation, List[Publication]]]:
     with Pool(n_jobs) as pool:
-        entries = progress_entries(
-            o for o in map(get_entry, entries_html) if o is not None
+        rows = progress_rows(
+            o
+            for o in map(get_row, rows_html)
+            if o is not None and o.id not in ignore_ids
         )
 
         for report in progress_reports(
-            o for o in pool.imap(get_report, entries) if o is not None
+            o for o in pool.imap(get_report, rows) if o is not None
         ):
-            entry = report.entry
+            row = report.row
 
             post = Post(
-                date=entry.date,
-                id=entry.id,
-                title=entry.title,
-                countries=entry.countries,
+                date=row.date,
+                id=row.id,
+                title=row.title,
+                countries=row.countries,
                 keywords=report.keywords,
                 languages=report.languages,
-                outlets=entry.outlets,
+                outlets=row.outlets,
             )
 
             annotation = Annotation(
@@ -298,28 +306,35 @@ def extract(
                 )
                 for link, archived_link in report.publications
             ]
-            yield (post, annotation, publications)
+            yield post, annotation, publications
 
 
 def write(
-    out_dir: Path, gen: Iterator[Tuple[Post, Annotation, List[Publication]]]
+    out_dir: Path,
+    overwrite: bool,
+    num_entries: Optional[int],
+    gen: Iterator[Tuple[Post, Annotation, List[Publication]]],
 ):
-    mode = "w"
-    with open(out_dir / POSTS_FILENAME, mode) as posts_file, open(
-        out_dir / ANNOTATIONS_FILENAME, mode
+    mode = "w" if overwrite else "a"
+    encoding = "utf-8"
+    with open(
+        out_dir / POSTS_FILENAME, mode, encoding=encoding
+    ) as posts_file, open(
+        out_dir / ANNOTATIONS_FILENAME, mode, encoding=encoding
     ) as annotations_file, open(
-        out_dir / PUBLICATIONS_FILENAME, mode
+        out_dir / PUBLICATIONS_FILENAME, mode, encoding=encoding
     ) as publications_file:
         posts_writer = DictWriter(posts_file, Post._fields)
-        posts_writer.writeheader()
         annotations_writer = DictWriter(annotations_file, Annotation._fields)
-        annotations_writer.writeheader()
         publications_writer = DictWriter(
             publications_file, Publication._fields
         )
-        publications_writer.writeheader()
+        if overwrite:
+            posts_writer.writeheader()
+            annotations_writer.writeheader()
+            publications_writer.writeheader()
 
-        for post, annotation, publications in gen:
+        for post, annotation, publications in islice(gen, num_entries):
             for publication in publications:
                 publications_writer.writerow(stringify(publication._asdict()))
             publications_file.flush()
@@ -349,6 +364,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "-f",
+        "--fresh",
+        help="overwrite existing files",
+        action="store_true",
+        default=False,
+    )
+
+    parser.add_argument(
         "-n",
         "--lines",
         metavar="N",
@@ -356,6 +379,7 @@ if __name__ == "__main__":
         type=check_non_negative,
         default=None,
     )
+
     parser.add_argument(
         "-j",
         "--jobs",
@@ -404,39 +428,61 @@ if __name__ == "__main__":
     if not args.show_warnings:
         LOGGER.setLevel(logging.ERROR)
 
-    iterator = islice(all_entries(), args.lines)
+    if args.fresh:
+        LOGGER.info("Overwriting existing files")
 
-    total_entries = get_total_entries() if args.lines is None else args.lines
-    chars_needed = str(len(str(total_entries)))
-    bar_format = (
-        "{l_bar}{bar}|{n_fmt:>"
-        + chars_needed
-        + "}/{total_fmt:>"
-        + chars_needed
-        + "} "
-    )
+    len_all_entries = get_len_total_entries()
+    total_entries = len_all_entries if args.lines is None else args.lines
+
+    ignore_ids = [] if args.fresh else get_scraped_ids(args.dir)
+
+    def progress(**kwargs):
+        chars_needed = str(len(str(total_entries)))
+        bar_format = (
+            "{l_bar}{bar}|{n_fmt:>"
+            + chars_needed
+            + "}/{total_fmt:>"
+            + chars_needed
+            + "} "
+        )
+        return lambda iterator: tqdm(
+            iterable=iterator,
+            disable=not args.show_progress,
+            bar_format=bar_format,
+            **kwargs,
+        )
+
+    if args.fresh:
+        rows_total = total_entries
+        reports_initial = 0
+        reports_total = total_entries
+    else:
+        rows_total = len_all_entries
+        reports_initial = len(ignore_ids)
+        reports_total = (
+            len_all_entries
+            if args.lines is None
+            else len(ignore_ids) + args.lines
+        )
 
     extracted = extract(
-        iterator,
+        all_rows(),
         n_jobs=args.jobs,
-        progress_entries=lambda it: tqdm(
-            it,
-            desc="Entries  ",
-            total=total_entries,
-            colour="yellow",
-            position=0,
-            disable=not args.show_progress,
-            bar_format=bar_format,
+        ignore_ids=ignore_ids,
+        progress_rows=progress(
+            desc="Parsing rows    ", colour="yellow", total=rows_total
         ),
-        progress_reports=lambda it: tqdm(
-            it,
-            desc="╰╴Reports",
-            total=total_entries,
+        progress_reports=progress(
+            desc="Scraping reports",
             colour="green",
-            position=1,
-            disable=not args.show_progress,
-            bar_format=bar_format,
+            initial=reports_initial,
+            total=reports_total,
         ),
     )
 
-    write(args.dir, extracted)
+    write(
+        out_dir=args.dir,
+        overwrite=args.fresh,
+        num_entries=args.lines,
+        gen=extracted,
+    )
