@@ -1,0 +1,155 @@
+{
+  "profile": "tabular-data-package",
+  "resources": [
+    {
+      "name": "posts",
+      "path": "posts.csv",
+      "profile": "tabular-data-resource",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "format": "default",
+            "title": "Date",
+            "description": "\"Date of Publication\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "format": "uri",
+            "title": "URL",
+            "description": "URL of this entry on euvsdisinfo.eu"
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "format": "default",
+            "title": "Title",
+            "description": "\"Title\" field on euvsdisinfo.eu/disinformation-cases/"
+          },
+          {
+            "name": "countries",
+            "type": "string",
+            "format": "default",
+            "title": "List of countries",
+            "description": "\"Country\" field on euvsdisinfo.eu/disinformation-cases/"
+          },
+          {
+            "name": "keywords",
+            "type": "string",
+            "format": "default",
+            "title": "List of keywords",
+            "description": "\"Keywords\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "languages",
+            "type": "string",
+            "format": "default",
+            "title": "List of languages",
+            "description": "\"Language/Target Audience\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "outlets",
+            "type": "string",
+            "format": "default",
+            "title": "List of outlets",
+            "description": "\"Outlets\" field on euvsdisinfo.eu/disinformation-cases/"
+          }
+        ]
+      }
+    },
+    {
+      "name": "annotations",
+      "path": "annotations.csv",
+      "profile": "tabular-data-resource",
+      "schema": {
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "format": "uri",
+            "title": "URL",
+            "description": "URL of this entry on euvsdisinfo.eu"
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "format": "default",
+            "title": "Summary",
+            "description": "\"Summary\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "disproof",
+            "type": "string",
+            "format": "default",
+            "title": "Disproof",
+            "description": "\"Disproof\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "summary_links",
+            "type": "string",
+            "format": "default",
+            "title": "List of links in Summary",
+            "description": "List of links in the \"Summary\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "summary_links_resolved",
+            "type": "string",
+            "format": "default",
+            "title": "List of resolved links in Summary",
+            "description": "List of resolved links in the \"Summary\" field on euvsdisinfo.eu/report/ (includes error when there was an error during resolution)"
+          },
+          {
+            "name": "disproof_links",
+            "type": "string",
+            "format": "default",
+            "title": "List of links in Disproof",
+            "description": "List of links in the \"Disproof\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "disproof_links_resolved",
+            "type": "string",
+            "format": "default",
+            "title": "List of resolved links in Disproof",
+            "description": "List of resolved links in the \"Disproof\" field on euvsdisinfo.eu/report/ (includes error when there was an error during resolution)"
+          }
+        ]
+      }
+    },
+    {
+      "name": "publications",
+      "path": "publications.csv",
+      "profile": "tabular-data-resource",
+      "schema": {
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "format": "uri",
+            "title": "URL",
+            "description": "URL of this entry on euvsdisinfo.eu"
+          },
+          {
+            "name": "publication",
+            "type": "string",
+            "format": "uri",
+            "title": "Publication URL",
+            "description": "URL of an entry in the \"Publication/Media\" field on euvsdisinfo.eu/report/"
+          },
+          {
+            "name": "archive",
+            "type": "string",
+            "format": "uri",
+            "title": "Archived Publication URL",
+            "description": "URL of an entry in the \"Publication/Media\" field on euvsdisinfo.eu/report/ (Archived URL)"
+          }
+        ]
+      }
+    }
+  ],
+  "name": "euvsdisinfo",
+  "title": "EUvsDisinfo",
+  "description": "Scraped entries from the EUvsDisinfo database (https://euvsdisinfo.eu/disinformation-cases/)",
+  "homepage": "https://github.com/cknabs/EUvsDisinfo"
+}
