@@ -1,5 +1,12 @@
 import argparse
+from pathlib import Path
 from typing import Any, Dict, List
+
+DATA_DIR = Path(__file__).absolute().parent.parent / "data"
+POSTS_FILENAME = "posts.csv"
+PUBLICATIONS_FILENAME = "publications.csv"
+ANNOTATIONS_FILENAME = "annotations.csv"
+SCHEMA_FILENAME = "datapackage.json"
 
 LIST_SEPARATOR: str = "+"
 

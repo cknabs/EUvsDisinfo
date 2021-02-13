@@ -16,13 +16,18 @@ import requests as req
 import urllib3
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-from util import LIST_SEPARATOR, check_non_negative, stringify
+from util import (
+    ANNOTATIONS_FILENAME,
+    DATA_DIR,
+    LIST_SEPARATOR,
+    POSTS_FILENAME,
+    PUBLICATIONS_FILENAME,
+    check_non_negative,
+    stringify,
+)
 
 URL = "https://euvsdisinfo.eu/disinformation-cases"
 LOGGER = logging.getLogger(__name__)
-POSTS_FILENAME = "posts.csv"
-PUBLICATIONS_FILENAME = "publications.csv"
-ANNOTATIONS_FILENAME = "annotations.csv"
 
 Post = namedtuple(
     "Post",
@@ -359,7 +364,7 @@ if __name__ == "__main__":
         metavar="DIR",
         help="output directory",
         type=lambda p: Path(p).absolute(),
-        default=Path(__file__).absolute().parent.parent / "data",
+        default=DATA_DIR,
         nargs="?",
     )
 
