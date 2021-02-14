@@ -1,4 +1,5 @@
 import argparse
+import functools
 import logging
 import urllib.error
 import urllib.parse
@@ -12,7 +13,6 @@ from typing import Collection, Generator, Iterator, List, Optional, Tuple
 
 import pandas as pd
 import requests
-import requests as req
 import urllib3
 from bs4 import BeautifulSoup
 from tqdm import tqdm
@@ -56,11 +56,11 @@ Annotation = namedtuple(
 Publication = namedtuple("Publication", ["id", "publication", "archive"])
 
 
-def all_rows() -> Generator:
+def all_rows(session) -> Generator:
     """Generator, yields all rows"""
     offset = 0
     while True:
-        html = req.get(URL, params={"offset": offset, "per_page": 100})
+        html = session.get(URL, params={"offset": offset, "per_page": 100})
         soup = BeautifulSoup(html.text, "html.parser")
         all_posts = soup.find_all(attrs={"class": "disinfo-db-post"})
         if len(all_posts) == 0:
@@ -70,8 +70,8 @@ def all_rows() -> Generator:
             offset += 1
 
 
-def get_len_total_entries() -> int:
-    html = req.get(URL)
+def get_len_total_entries(session) -> int:
+    html = session.get(URL)
     soup = BeautifulSoup(html.text, "html.parser")
     return int(
         soup.find(attrs={"class": "disinfo-db-results"})
@@ -137,14 +137,11 @@ class Report:
     languages: List[str] = []
     publications: List[Tuple[str, str]] = []
 
-    def __init__(self, row: Row):
-        self.row = row
-        self.id = self.row.id
+    def __init__(self, id_, report, req=requests):
+        self.id = id_
 
         # Get keywords, summary, disproof from report page
         try:
-            report = BeautifulSoup(req.get(self.id).text, "html.parser")
-
             try:
                 self.keywords = [
                     k.strip()
@@ -162,7 +159,8 @@ class Report:
                 links = [a["href"] for a in summary_container.find_all("a")]
                 self.summary_links = [self.url_encode(link) for link in links]
                 self.summary_links_resolved = [
-                    self.url_encode(self.resolve_link(link)) for link in links
+                    self.url_encode(self.resolve_link(req, link))
+                    for link in links
                 ]
             except AttributeError:
                 self.warn_missing("summary")
@@ -174,7 +172,8 @@ class Report:
                 links = [a["href"] for a in disproof_container.find_all("a")]
                 self.disproof_links = [self.url_encode(link) for link in links]
                 self.disproof_links_resolved = [
-                    self.url_encode(self.resolve_link(link)) for link in links
+                    self.url_encode(self.resolve_link(req, link))
+                    for link in links
                 ]
             except AttributeError:
                 self.warn_missing("disproof")
@@ -211,9 +210,9 @@ class Report:
         LOGGER.warning(f"Missing data '{name}' for {self.id}")
 
     @staticmethod
-    def resolve_link(url: str) -> str:
+    def resolve_link(session, url: str) -> str:
         try:
-            response = requests.head(url, allow_redirects=True)
+            response = session.head(url, allow_redirects=True)
             if response.status_code == 200:
                 return response.url
             else:
@@ -250,12 +249,13 @@ def get_row(row_html) -> Optional[Row]:
     return None
 
 
-def get_report(row: Row) -> Optional[Report]:
+def get_report(session, row: Row) -> Optional[Tuple[Row, Report]]:
     """Wrapper for :class:`Report` initialization, return None on error.
     Defined here to be picklable.
     """
     try:
-        return Report(row)
+        report = BeautifulSoup(session.get(row.id).text, "html.parser")
+        return row, Report(row.id, report, req=session)
     except MalformedDataError as mde:
         LOGGER.warning(f"WARNING: {repr(mde)} from {repr(mde.__cause__)}")
     return None
@@ -267,6 +267,7 @@ def get_scraped_ids(out_dir: Path) -> Collection[str]:
 
 
 def extract(
+    session,
     rows_html,
     n_jobs: int,
     ignore_ids: Collection[str],
@@ -280,11 +281,11 @@ def extract(
             if o is not None and o.id not in ignore_ids
         )
 
-        for report in progress_reports(
-            o for o in pool.imap(get_report, rows) if o is not None
+        for row, report in progress_reports(
+            o
+            for o in pool.imap(functools.partial(get_report, session), rows)
+            if o is not None
         ):
-            row = report.row
-
             post = Post(
                 date=row.date,
                 id=row.id,
@@ -296,7 +297,7 @@ def extract(
             )
 
             annotation = Annotation(
-                id=report.id,
+                id=row.id,
                 summary=report.summary,
                 disproof=report.disproof,
                 summary_links=report.summary_links,
@@ -306,9 +307,7 @@ def extract(
             )
 
             publications = [
-                Publication(
-                    id=report.id, publication=link, archive=archived_link
-                )
+                Publication(id=row.id, publication=link, archive=archived_link)
                 for link, archived_link in report.publications
             ]
             yield post, annotation, publications
@@ -436,58 +435,60 @@ if __name__ == "__main__":
     if args.fresh:
         LOGGER.info("Overwriting existing files")
 
-    len_all_entries = get_len_total_entries()
-    total_entries = len_all_entries if args.lines is None else args.lines
-
     ignore_ids = [] if args.fresh else get_scraped_ids(args.dir)
 
-    def progress(**kwargs):
-        chars_needed = str(len(str(total_entries)))
-        bar_format = (
-            "{l_bar}{bar}|{n_fmt:>"
-            + chars_needed
-            + "}/{total_fmt:>"
-            + chars_needed
-            + "} "
-        )
-        return lambda iterator: tqdm(
-            iterable=iterator,
-            disable=not args.show_progress,
-            bar_format=bar_format,
-            **kwargs,
+    with requests.Session() as session:
+        len_all_entries = get_len_total_entries(session)
+        total_entries = len_all_entries if args.lines is None else args.lines
+
+        def progress(**kwargs):
+            chars_needed = str(len(str(total_entries)))
+            bar_format = (
+                "{l_bar}{bar}|{n_fmt:>"
+                + chars_needed
+                + "}/{total_fmt:>"
+                + chars_needed
+                + "} "
+            )
+            return lambda iterator: tqdm(
+                iterable=iterator,
+                disable=not args.show_progress,
+                bar_format=bar_format,
+                **kwargs,
+            )
+
+        if args.fresh:
+            rows_total = total_entries
+            reports_initial = 0
+            reports_total = total_entries
+        else:
+            rows_total = len_all_entries
+            reports_initial = len(ignore_ids)
+            reports_total = (
+                len_all_entries
+                if args.lines is None
+                else len(ignore_ids) + args.lines
+            )
+
+        extracted = extract(
+            session,
+            all_rows(session),
+            n_jobs=args.jobs,
+            ignore_ids=ignore_ids,
+            progress_rows=progress(
+                desc="Parsing rows    ", colour="yellow", total=rows_total
+            ),
+            progress_reports=progress(
+                desc="Scraping reports",
+                colour="green",
+                initial=reports_initial,
+                total=reports_total,
+            ),
         )
 
-    if args.fresh:
-        rows_total = total_entries
-        reports_initial = 0
-        reports_total = total_entries
-    else:
-        rows_total = len_all_entries
-        reports_initial = len(ignore_ids)
-        reports_total = (
-            len_all_entries
-            if args.lines is None
-            else len(ignore_ids) + args.lines
+        write(
+            out_dir=args.dir,
+            overwrite=args.fresh,
+            num_entries=args.lines,
+            gen=extracted,
         )
-
-    extracted = extract(
-        all_rows(),
-        n_jobs=args.jobs,
-        ignore_ids=ignore_ids,
-        progress_rows=progress(
-            desc="Parsing rows    ", colour="yellow", total=rows_total
-        ),
-        progress_reports=progress(
-            desc="Scraping reports",
-            colour="green",
-            initial=reports_initial,
-            total=reports_total,
-        ),
-    )
-
-    write(
-        out_dir=args.dir,
-        overwrite=args.fresh,
-        num_entries=args.lines,
-        gen=extracted,
-    )
