@@ -1,6 +1,9 @@
 import argparse
+from collections import namedtuple
 from pathlib import Path
 from typing import Any, Dict, List
+
+URL = "https://euvsdisinfo.eu/disinformation-cases"
 
 DATA_DIR = Path(__file__).absolute().parent.parent / "data"
 POSTS_FILENAME = "posts.csv"
@@ -9,6 +12,32 @@ ANNOTATIONS_FILENAME = "annotations.csv"
 SCHEMA_FILENAME = "datapackage.json"
 
 LIST_SEPARATOR: str = "+"
+
+Post = namedtuple(
+    "Post",
+    [
+        "date",
+        "id",
+        "title",
+        "countries",
+        "keywords",
+        "languages",
+        "outlets",
+    ],
+)
+Annotation = namedtuple(
+    "Annotation",
+    [
+        "id",
+        "summary",
+        "disproof",
+        "summary_links",
+        "summary_links_resolved",
+        "disproof_links",
+        "disproof_links_resolved",
+    ],
+)
+Publication = namedtuple("Publication", ["id", "publication", "archive"])
 
 
 def list2str(lst: List[str]) -> str:
