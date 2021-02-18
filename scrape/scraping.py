@@ -21,6 +21,8 @@ from scrape.util import (
     stringify,
 )
 
+# file deepcode ignore BinaryWrite:
+
 logger = logging.getLogger(__name__)
 
 
