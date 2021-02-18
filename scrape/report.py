@@ -109,9 +109,7 @@ class Report:
             except AttributeError:
                 self.warn_missing("disproof")
         except Exception as exception:
-            raise MalformedDataError(
-                "Malformed report error", self.id
-            ) from exception
+            self.warn_missing(repr(exception))
 
         # Get data on publications from report page
         try:
@@ -133,12 +131,13 @@ class Report:
                 l1, l2 = links[0], links[1] if len(links) == 2 else None
                 self.publications.append((l1, l2))
         except Exception as exception:
-            raise MalformedDataError(
-                "Malformed publications error", self.id
-            ) from exception
+            self.warn_missing(repr(exception))
 
     def warn_missing(self, name: str):
-        logger.warning(f"Missing data '{name}' for {self.id}")
+        self.warn(f"Missing data '{name}' for {self.id}")
+
+    def warn(self, msg: str):
+        logger.warning(msg)
 
     @staticmethod
     def resolve_link(session, url: str) -> str:
