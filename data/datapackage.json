@@ -143,14 +143,14 @@
           {
             "name": "publication",
             "type": "string",
-            "format": "uri",
+            "format": "default",
             "title": "Publication URL",
             "description": "URL of an entry in the \"Publication/Media\" field on euvsdisinfo.eu/report/"
           },
           {
             "name": "archive",
             "type": "string",
-            "format": "uri",
+            "format": "default",
             "title": "Archived Publication URL",
             "description": "URL of an entry in the \"Publication/Media\" field on euvsdisinfo.eu/report/ (Archived URL)"
           }
