@@ -56,7 +56,8 @@
             "title": "List of outlets",
             "description": "\"Outlets\" field on euvsdisinfo.eu/disinformation-cases/"
           }
-        ]
+        ],
+        "primaryKey": "id"
       }
     },
     {
@@ -114,6 +115,15 @@
             "title": "List of resolved links in Disproof",
             "description": "List of resolved links in the \"Disproof\" field on euvsdisinfo.eu/report/ (includes error when there was an error during resolution)"
           }
+        ],
+        "foreignKeys": [
+          {
+            "fields": "id",
+            "reference": {
+              "resource": "posts",
+              "fields": "id"
+            }
+          }
         ]
       }
     },
@@ -143,6 +153,15 @@
             "format": "uri",
             "title": "Archived Publication URL",
             "description": "URL of an entry in the \"Publication/Media\" field on euvsdisinfo.eu/report/ (Archived URL)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "fields": "id",
+            "reference": {
+              "resource": "posts",
+              "fields": "id"
+            }
           }
         ]
       }
