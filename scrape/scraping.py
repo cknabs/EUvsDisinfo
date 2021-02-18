@@ -2,7 +2,7 @@ import functools
 import logging
 from csv import DictWriter
 from itertools import islice
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 from pathlib import Path
 from typing import Collection, Generator, Iterator, List, Optional, Tuple
 
@@ -83,24 +83,27 @@ def translate(
     return post, annotation, publications
 
 
+def get(session, ignore_ids, row_html):
+    row = get_row(row_html)
+    if row.id in ignore_ids:
+        return None
+    return get_report(session, row)
+
+
 def extract(
     session,
     rows_html,
-    n_jobs: int,
     ignore_ids: Collection[str],
     progress_rows,
     progress_reports,
 ) -> Iterator[Tuple[Post, Annotation, List[Publication]]]:
-    with Pool(n_jobs) as pool:
-        rows = progress_rows(
-            o
-            for o in map(get_row, rows_html)
-            if o is not None and o.id not in ignore_ids
-        )
-
+    with Pool() as pool:
         for row, report in progress_reports(
             o
-            for o in pool.imap(functools.partial(get_report, session), rows)
+            for o in pool.imap_unordered(
+                functools.partial(get, session, ignore_ids),
+                progress_rows(rows_html),
+            )
             if o is not None
         ):
             yield translate(row, report)
@@ -141,6 +144,3 @@ def write(
 
             posts_writer.writerow(stringify(post._asdict()))
             posts_file.flush()
-
-
-print("scraping.py", __name__)

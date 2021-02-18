@@ -50,47 +50,24 @@ parser.add_argument(
     default=None,
 )
 
-parser.add_argument(
-    "-j",
-    "--jobs",
-    metavar="N",
-    help="number of jobs to use (default: %(default)s)",
-    type=check_non_negative,
-    default=16,
-)
-
 group = parser.add_argument_group("verbosity arguments")
-group_warnings = group.add_mutually_exclusive_group()
-group_warnings.add_argument(
-    "-w",
-    "--show-warnings",
-    dest="show_warnings",
-    help="show warnings",
-    action="store_true",
-    default=False,
-)
-group_warnings.add_argument(
+
+group.add_argument(
     "-nw",
     "--no-warnings",
     dest="show_warnings",
-    help="hide warnings (default)",
+    help="hide warnings",
     action="store_false",
-)
-group_progress = group.add_mutually_exclusive_group()
-group_progress.add_argument(
-    "-p",
-    "--show-progress",
-    dest="show_progress",
-    help="show progress bar (default)",
-    action="store_true",
     default=True,
 )
-group_progress.add_argument(
+
+group.add_argument(
     "-np",
     "--no-progress",
     dest="show_progress",
     help="hide progress bar",
     action="store_false",
+    default=True,
 )
 
 args = parser.parse_args()
@@ -139,7 +116,6 @@ with requests.Session() as session:
     extracted = extract(
         session,
         all_rows(session),
-        n_jobs=args.jobs,
         ignore_ids=ignore_ids,
         progress_rows=progress(
             desc="Parsing rows    ", colour="yellow", total=rows_total
