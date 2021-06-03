@@ -30,12 +30,14 @@ header = dbc.NavbarSimple(
                 dbc.NavLink("Analysis", href="/analysis", active="partial")
             ),
         ],
-        pills=True,
+        pills=False,
         navbar=True,
     ),
     brand=datalegreya,
     fluid=True,
-    className="custom-container"
+    className="custom-container",
+    dark="True",
+    color="dark",
 )
 
-empty_line = dbc.Row(className='empty-row')
+empty_line = dbc.Row(className="empty-row")
