@@ -1,4 +1,5 @@
 import dash_bootstrap_components as dbc
+import dash_core_components as dcc
 
 # TODO: generate the following from the actual data
 vals = [0, 2, 1, 2, 1, 2, 2, 1, 2, 2, 3, 2, 3]
@@ -21,6 +22,7 @@ padding_style = {"padding-left": "5%", "padding-right": "5%"}
 header = dbc.NavbarSimple(
     dbc.Nav(
         children=[
+            dbc.NavItem(dbc.NavLink("Home", href="/", active="exact")),
             dbc.NavItem(
                 dbc.NavLink(
                     "Visualization", href="/visualization", active="partial"
@@ -34,6 +36,7 @@ header = dbc.NavbarSimple(
         navbar=True,
     ),
     brand=datalegreya,
+    brand_href="/",
     fluid=True,
     className="custom-container",
     dark="True",

@@ -17,7 +17,7 @@ app.layout = html.Div(
 @app.callback(Output("page-content", "children"), Input("url", "pathname"))
 def display_page(pathname):
     if pathname == "/":
-        return apps.database.layout
+        return apps.home.layout
     if pathname == "/visualization":
         return apps.database.layout
     elif pathname == "/analysis":
