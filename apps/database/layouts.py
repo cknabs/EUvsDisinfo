@@ -52,6 +52,7 @@ graphs = dbc.Row(
 
 layout = [
     header,
+    empty_line,
     dbc.Container(
         [empty_line, graphs], fluid=True, className="custom-container"
     ),
