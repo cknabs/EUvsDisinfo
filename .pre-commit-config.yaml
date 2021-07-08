@@ -3,11 +3,11 @@ repos:
     rev: v3.4.0
     hooks:
       - id: trailing-whitespace
-        exclude: '^data/[^/]+\.csv'
+        exclude: '^data/[^/]+\.csv|\.md$'
       - id: mixed-line-ending
-        exclude: '^data/[^/]+\.csv'
+        exclude: '^data/[^/]+\.csv|\.md$'
       - id: end-of-file-fixer
-        exclude: '^data/[^/]+\.csv'
+        exclude: '^data/[^/]+\.csv|\.md$'
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
