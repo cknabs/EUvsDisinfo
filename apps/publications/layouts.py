@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
@@ -22,15 +24,18 @@ slider = dbc.Row(
     ],
 )
 
-graphs = dbc.Col(
-    [dcc.Graph(id="fig-social"), dcc.Graph(id="fig-publishers")],
-)
+curr_dir = Path(__file__).resolve().parent
 
-layout = [
-    header,
-    dbc.Container(
-        [
-            slider,
-            graphs
-        ], className="custom-container")
+with open(curr_dir / "publishers-socials.md", "r") as fig_social_md_file:
+    fig_social_md = fig_social_md_file.read()
+fig_social_text = dcc.Markdown(children=fig_social_md)
+
+rows = [
+    slider,
+    dbc.Row(
+        [fig_social_text, dcc.Graph(id="fig-social")], className="full-height"
+    ),
+    dbc.Row([dcc.Graph(id="fig-publishers")], className="full-height"),
 ]
+
+layout = [header, dbc.Container(rows, className="custom-container")]

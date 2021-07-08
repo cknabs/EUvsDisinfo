@@ -174,5 +174,5 @@ def update_figures(value):
     [Input("percentile-slider", "value")],
 )
 def update_output(value):
-    percentile_value = f"Show top {int(100 * value)}% only)"
+    percentile_value = f"Show top {int(100 * value)}% of all publishers"
     return percentile_value
