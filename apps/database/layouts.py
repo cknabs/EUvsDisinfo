@@ -48,6 +48,7 @@ graphs = dbc.Row(
             id="col-db-table",
         ),
     ],
+    className="full-height",
 )
 
 layout = [
