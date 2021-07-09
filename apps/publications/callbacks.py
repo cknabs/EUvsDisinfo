@@ -160,7 +160,6 @@ def fig_graph_socials(
     title: str,
     percentile_cutoff: float = 0.5,
     percentile_bins: int = 100,
-    color=True,
 ) -> Figure:
     data = data.copy()
     assert 0.0 <= percentile_cutoff <= 1.0
@@ -305,21 +304,15 @@ def fig_graph_socials(
 
 
 @app.callback(
-    [Output("fig-social", "figure"), Output("fig-publishers", "figure")],
+    Output("fig-publishers", "figure"),
     [Input("percentile-slider", "value")],
 )
 def update_figures(value):
     percentile_cutoff = 1.0 - value
-    fig_social = fig_graph_socials(
-        res_social,
-        "Publishers and Social Media Profiles",
-        percentile_cutoff=percentile_cutoff,
-        color=False,
-    )
     fig_publishers = fig_graph(
         res_content, "Publishers", percentile_cutoff=percentile_cutoff
     )
-    return fig_social, fig_publishers
+    return fig_publishers
 
 
 @app.callback(

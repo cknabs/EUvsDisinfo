@@ -5,6 +5,8 @@ import dash_core_components as dcc
 import dash_html_components as html
 
 from apps.layouts import header
+from apps.publications.callbacks import fig_graph_socials
+from apps.publications.data import res_social
 
 slider = dbc.Row(
     children=[
@@ -30,12 +32,26 @@ with open(curr_dir / "publishers-socials.md", "r") as fig_social_md_file:
     fig_social_md = fig_social_md_file.read()
 fig_social_text = dcc.Markdown(children=fig_social_md)
 
-rows = [
-    slider,
-    dbc.Row(
-        [fig_social_text, dcc.Graph(id="fig-social")], className="full-height"
+fig_social_graph = fig_graph_socials(
+    res_social,
+    "Publishers and Social Media Profiles",
+    percentile_cutoff=0,
+)
+
+containers = [
+    dbc.Container(
+        dbc.Row(
+            [
+                fig_social_text,
+                dcc.Graph(figure=fig_social_graph, id="fig-social"),
+            ]
+        ),
+        className="full-height",
     ),
-    dbc.Row([dcc.Graph(id="fig-publishers")], className="full-height"),
+    dbc.Container(
+        [slider, dbc.Row(dcc.Graph(id="fig-publishers"))],
+        className="full-height",
+    ),
 ]
 
-layout = [header, dbc.Container(rows, className="custom-container")]
+layout = [header, dbc.Container(containers, className="custom-container")]
