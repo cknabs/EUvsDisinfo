@@ -30,12 +30,20 @@ with open(curr_dir / "publishers-socials.md", "r") as fig_social_md_file:
     fig_social_md = fig_social_md_file.read()
 fig_social_text = dcc.Markdown(children=fig_social_md)
 
-rows = [
-    slider,
-    dbc.Row(
-        [fig_social_text, dcc.Graph(id="fig-social")], className="full-height"
+containers = [
+    dbc.Container(
+        dbc.Row(
+            [
+                fig_social_text,
+                dcc.Loading(dcc.Graph(id="fig-social"), id="loading-social"),
+            ]
+        ),
+        className="full-height",
     ),
-    dbc.Row([dcc.Graph(id="fig-publishers")], className="full-height"),
+    dbc.Container(
+        [slider, dcc.Loading(dbc.Row(dcc.Graph(id="fig-publishers")))],
+        className="full-height",
+    ),
 ]
 
-layout = [header, dbc.Container(rows, className="custom-container")]
+layout = [header, dbc.Container(containers, className="custom-container")]
