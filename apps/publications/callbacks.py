@@ -1,3 +1,4 @@
+import dash_core_components as dcc
 import igraph as ig
 import numpy as np
 from dash.dependencies import Input, Output
@@ -304,10 +305,22 @@ def fig_graph_socials(
 
 
 @app.callback(
+    Output("loading-social", "children"), Input("loading-social", "value")
+)
+def get_fig_social(x):
+    fig_social_graph = fig_graph_socials(
+        res_social,
+        "Publishers and Social Media Profiles",
+        percentile_cutoff=0,
+    )
+    return dcc.Graph(figure=fig_social_graph, id="fig-social")
+
+
+@app.callback(
     Output("fig-publishers", "figure"),
     [Input("percentile-slider", "value")],
 )
-def update_figures(value):
+def get_fig_publishers(value):
     percentile_cutoff = 1.0 - value
     fig_publishers = fig_graph(
         res_content, "Publishers", percentile_cutoff=percentile_cutoff
