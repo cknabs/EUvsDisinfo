@@ -1,6 +1,5 @@
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 
 from apps.database.callbacks import update_timeline
 from apps.layouts import empty_line, header

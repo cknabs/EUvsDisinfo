@@ -1,6 +1,6 @@
-import dash_core_components as dcc
 import igraph as ig
 import numpy as np
+from dash import dcc
 from dash.dependencies import Input, Output
 from pandas import DataFrame
 from plotly import graph_objects as go

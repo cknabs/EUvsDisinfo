@@ -1,16 +1,17 @@
 gunicorn>=20.0.0
-plotly==5.1.0
-pandas==1.3.0
-numpy==1.22.0
-dash~=1.20.0
-dash-bootstrap-components~=0.12.0
+plotly==5.5.0
+pandas==1.3.5
+numpy==1.22.1
+dash==2.0.0
+dash-bootstrap-components==1.0.2
 tld~=0.12.4
-requests~=2.25.1
-beautifulsoup4~=4.9.3
-tqdm==4.61.2
-langcodes==3.1.0
+requests==2.27.1
+beautifulsoup4==4.10.0
+tqdm==4.62.3
+langcodes==3.3.0
 country-converter~=0.7.1
 python-igraph==0.9.6
 newspaper3k~=0.2.8
 urllib3~=1.26.2 # Needed for https://github.com/psf/requests/issues/5744
-frictionless==4.12.4
+frictionless==4.23.2
+orjson==3.6.5 # For better performance (dash)
