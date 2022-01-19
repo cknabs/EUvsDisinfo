@@ -35,6 +35,7 @@ graphs = dbc.Row(
             dcc.Graph(
                 id="fig-timeline",
                 figure=update_timeline(),
+                style=dict(height="100%"),
             ),
             width=8,
         ),

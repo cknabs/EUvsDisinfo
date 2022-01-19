@@ -71,6 +71,7 @@ def update_timeline():
             showgrid=True,
         ),
         legend=dict(traceorder="normal"),
+        autosize=True,
     )
     fig = go.Figure(data=traces, layout=layout)
 
