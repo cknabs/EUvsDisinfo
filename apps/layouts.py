@@ -1,13 +1,15 @@
-import dash_bootstrap_components as dbc
-import dash_core_components as dcc
+from datetime import datetime
 
-# TODO: generate the following from the actual data
+import dash_bootstrap_components as dbc
+
+from apps.database.data import df
+
 vals = [0, 2, 1, 2, 1, 2, 2, 1, 2, 2, 3, 2, 3]
 text = "eu vs disinfo"
 min_x = " 2015"
-max_x = " 2021"
+max_x = " " + str(df.date.max().year)
 min_y = 0
-max_y = 10000
+max_y = len(df.id.unique())
 pos_min = 3
 pos_max = 12
 

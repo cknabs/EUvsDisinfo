@@ -1,6 +1,5 @@
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 
 from apps.database.callbacks import update_timeline
 from apps.layouts import empty_line, header
@@ -12,14 +11,17 @@ table_header = [
                 [
                     dbc.Badge(
                         id="timeline-th-num_entries",
+                        children="\u2000" * 2 + "\u000B",
                     ),
                     " entries in ",
                     dbc.Badge(
                         id="timeline-th-language",
+                        children="\u2000" * 6 + "\u000B",
                     ),
                     " for ",
                     dbc.Badge(
                         id="timeline-th-date",
+                        children="\u2000" * 12 + "\u000B",
                     ),
                 ]
             )
@@ -35,6 +37,7 @@ graphs = dbc.Row(
             dcc.Graph(
                 id="fig-timeline",
                 figure=update_timeline(),
+                style=dict(height="100%"),
             ),
             width=8,
         ),

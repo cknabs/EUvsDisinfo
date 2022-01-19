@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v4.1.0
     hooks:
       - id: trailing-whitespace
         exclude: '^data/[^/]+\.csv|\.md$'
@@ -13,15 +13,15 @@ repos:
       - id: check-added-large-files
         exclude: '^data/[^/]+\.csv'
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.4
+    rev: 3.9.2
     hooks:
       - id: flake8
   - repo: https://github.com/psf/black
-    rev: stable
+    rev: 21.12b0
     hooks:
       - id: black
   - repo: https://github.com/PyCQA/isort
-    rev: 5.7.0
+    rev: 5.10.1
     hooks:
       - id: isort
         additional_dependencies: [ "toml" ]
@@ -34,3 +34,18 @@ repos:
         pass_filenames: false
         always_run: true
         verbose: true
+  - repo: local
+    hooks:
+      - id: update-requirements-txt
+        name: update-requirements-txt
+        description: 'Generate requirements.txt based on poetry.lock'
+        entry: poetry
+        args: [ export, --format, requirements.txt, --without-hashes, --output, requirements.txt ]
+        language: system
+        pass_filenames: false
+      - id: update-runtime-txt
+        name: update-runtime-txt
+        description: 'Generate runtime.txt based on poetry.lock'
+        entry: bash -c 'poetry run python -V | sed "s/Python /python-/" > runtime.txt'
+        language: system
+        pass_filenames: false

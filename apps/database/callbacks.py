@@ -1,8 +1,7 @@
 from datetime import datetime
 
-import dash_bootstrap_components as dbc
-import dash_html_components as html
 import pandas as pd
+from dash import html
 from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 
@@ -71,6 +70,7 @@ def update_timeline():
             showgrid=True,
         ),
         legend=dict(traceorder="normal"),
+        autosize=True,
     )
     fig = go.Figure(data=traces, layout=layout)
 
@@ -89,9 +89,9 @@ def update_timeline():
 def update_selected_entries(click_data):
     if click_data is None:
         return (
-            "\t",
-            "\t",
-            "\t",
+            "\u2000" * 2 + "\u000B",
+            "\u2000" * 6 + "\u000B",
+            "\u2000" * 12 + "\u000B",
             [
                 html.Tr(
                     html.Td(
