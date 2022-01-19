@@ -12,14 +12,17 @@ table_header = [
                 [
                     dbc.Badge(
                         id="timeline-th-num_entries",
+                        children="\u2000" * 2 + "\u000B",
                     ),
                     " entries in ",
                     dbc.Badge(
                         id="timeline-th-language",
+                        children="\u2000" * 6 + "\u000B",
                     ),
                     " for ",
                     dbc.Badge(
                         id="timeline-th-date",
+                        children="\u2000" * 12 + "\u000B",
                     ),
                 ]
             )

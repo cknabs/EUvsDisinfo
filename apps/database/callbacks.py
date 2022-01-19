@@ -90,9 +90,9 @@ def update_timeline():
 def update_selected_entries(click_data):
     if click_data is None:
         return (
-            "\t",
-            "\t",
-            "\t",
+            "\u2000" * 2 + "\u000B",
+            "\u2000" * 6 + "\u000B",
+            "\u2000" * 12 + "\u000B",
             [
                 html.Tr(
                     html.Td(
