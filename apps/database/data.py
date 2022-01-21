@@ -3,11 +3,12 @@ import pandas as pd
 from apps.util import explode_replace
 
 # Data
-cols = ["id", "title", "date", "languages"]
+cols = ["id", "title", "date", "languages", "countries"]
 dtypes = {c: "string" for c in cols}
 df = pd.read_csv("data/posts.csv", usecols=cols, dtype=dtypes).fillna("")
 df["date"] = pd.to_datetime(df["date"])
 df = explode_replace(df, "languages", "language")
+df = explode_replace(df, "countries", "country")
 
 date_language = df[["date", "language"]]
 date_language = pd.pivot_table(

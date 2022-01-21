@@ -1,12 +1,15 @@
 from datetime import datetime
 
 import pandas as pd
+import plotly.express as px
 from dash import html
 from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 
 from app import app
 from apps.database.data import date_language, df
+
+custom_oranges_r = ["#000000"] + px.colors.sequential.Oranges_r[:-2]
 
 
 # @app.callback(
@@ -73,6 +76,73 @@ def update_timeline():
         autosize=True,
     )
     fig = go.Figure(data=traces, layout=layout)
+
+    return fig
+
+
+def update_map():
+    def to_month(x):
+        return datetime.strftime(x, "%Y-%m")
+
+    counts_by_date = (
+        df[["date", "country"]]
+        .reset_index(drop=True)
+        .value_counts()
+        .reset_index()
+        .rename(columns={0: "count"})
+    )
+    counts_by_date["month"] = counts_by_date["date"].map(to_month)
+    counts_by_date = counts_by_date.drop(columns=["date"]).sort_values(
+        by="month"
+    )
+
+    all_months = (
+        pd.date_range(
+            counts_by_date["month"].min(),
+            counts_by_date["month"].max(),
+            freq="M",
+        )
+        .map(to_month)
+        .to_frame(index=False, name="month")
+    )
+    all_countries = pd.Series(
+        counts_by_date["country"].unique(), name="country"
+    ).to_frame()
+    fill_vals = pd.merge(all_months, all_countries, how="cross")
+    fill_vals["count"] = 0
+
+    counts_by_date = (
+        pd.concat([counts_by_date, fill_vals])
+        .drop_duplicates(keep="first")
+        .sort_values(by="month")
+    )
+
+    fig = px.choropleth(
+        counts_by_date,
+        animation_frame="month",
+        animation_group="country",
+        locations="country",
+        locationmode="country names",
+        color="count",
+        color_continuous_scale=custom_oranges_r,
+        range_color=[0, counts_by_date["count"].max()],
+        scope="europe",
+    )
+
+    fig.update_layout(
+        geo=dict(
+            showframe=False,
+            showlakes=False,
+            showcoastlines=False,
+            landcolor="#000000",  # set default land color to black (to match colorscale above)
+        ),
+    )
+
+    # Speed up animation
+    fig.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"] = 50
+    fig.layout.updatemenus[0].buttons[0].args[1]["transition"][
+        "duration"
+    ] = 100
 
     return fig
 
