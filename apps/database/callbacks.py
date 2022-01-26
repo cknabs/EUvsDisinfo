@@ -7,7 +7,7 @@ from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 
 from app import app
-from apps.database.data import date_language, df
+from apps.database.data import counts_by_date, date_language, df
 
 custom_oranges_r = ["#000000"] + px.colors.sequential.Oranges_r[:-2]
 
@@ -80,43 +80,10 @@ def update_timeline():
     return fig
 
 
+fig_map = None
+
+
 def update_map():
-    def to_month(x):
-        return datetime.strftime(x, "%Y-%m")
-
-    counts_by_date = (
-        df[["date", "country"]]
-        .reset_index(drop=True)
-        .value_counts()
-        .reset_index()
-        .rename(columns={0: "count"})
-    )
-    counts_by_date["month"] = counts_by_date["date"].map(to_month)
-    counts_by_date = counts_by_date.drop(columns=["date"]).sort_values(
-        by="month"
-    )
-
-    all_months = (
-        pd.date_range(
-            counts_by_date["month"].min(),
-            counts_by_date["month"].max(),
-            freq="M",
-        )
-        .map(to_month)
-        .to_frame(index=False, name="month")
-    )
-    all_countries = pd.Series(
-        counts_by_date["country"].unique(), name="country"
-    ).to_frame()
-    fill_vals = pd.merge(all_months, all_countries, how="cross")
-    fill_vals["count"] = 0
-
-    counts_by_date = (
-        pd.concat([counts_by_date, fill_vals])
-        .drop_duplicates(keep="first")
-        .sort_values(by="month")
-    )
-
     fig = px.choropleth(
         counts_by_date,
         animation_frame="month",
@@ -127,8 +94,15 @@ def update_map():
         color_continuous_scale=custom_oranges_r,
         range_color=[0, counts_by_date["count"].max()],
         scope="europe",
+        labels={
+            "month": "Month",
+            "country": "Country/Region: ",
+            "count": "Numbers of Entries",
+        },
+        title="Countries and Regions discussed by month",
     )
 
+    # Update map appeareance
     fig.update_layout(
         geo=dict(
             showframe=False,
@@ -138,11 +112,52 @@ def update_map():
         ),
     )
 
+    # Add dropdown to choose the scope of the map
+    fig.update_layout(
+        updatemenus=list(fig.layout.updatemenus)
+        + [
+            dict(
+                buttons=list(
+                    [
+                        dict(
+                            args=["geo.scope", "europe"],
+                            label="Europe",
+                            method="relayout",
+                        ),
+                        dict(
+                            args=["geo.scope", "world"],
+                            label="World",
+                            method="relayout",
+                        ),
+                    ]
+                ),
+                direction="down",
+                # pad={"r": 10, "t": 10},
+                showactive=True,
+                x=0.06,
+                xanchor="left",
+                y=1.006,
+                yanchor="top",
+            ),
+        ],
+        annotations=[
+            dict(
+                text="Scope: ",
+                showarrow=False,
+                x=0,
+                y=1,
+                yref="paper",
+                align="left",
+                xanchor="left",
+                yanchor="top",
+            )
+        ],
+    )
+
     # Speed up animation
-    fig.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"] = 50
-    fig.layout.updatemenus[0].buttons[0].args[1]["transition"][
-        "duration"
-    ] = 100
+    play_button = fig.layout.updatemenus[0].buttons[0]
+    play_button.args[1]["frame"]["duration"] = 100
+    play_button.args[1]["transition"]["duration"] = 1000
 
     return fig
 

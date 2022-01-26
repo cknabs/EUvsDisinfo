@@ -54,14 +54,27 @@ graphs = dbc.Row(
     className="full-height",
 )
 
+map_scope_choices = {"Europe": "europe", "World": "world"}
+map_scope_choices_default = "europe"
+
 map = dbc.Row(
     [
         dbc.Col(
-            dcc.Graph(
-                id="fig-map",
-                figure=update_map(),
-                style=dict(height="100%"),
-            ),
+            dcc.Markdown(),
+            id="descr-map",
+        ),
+        dbc.Col(
+            children=[
+                dcc.Graph(
+                    id="fig-map",
+                    figure=update_map(),
+                    style={
+                        "height": "100%",
+                        ".gtitle": "{background-color: red;}",
+                    },
+                )
+            ],
+            width=8,
         ),
     ],
     className="full-height",
