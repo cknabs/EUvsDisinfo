@@ -1,12 +1,15 @@
 from datetime import datetime
 
 import pandas as pd
+import plotly.express as px
 from dash import html
 from dash.dependencies import Input, Output
 from plotly import graph_objects as go
 
 from app import app
-from apps.database.data import date_language, df
+from apps.database.data import counts_by_date, date_language, df
+
+custom_oranges_r = ["#000000"] + px.colors.sequential.Oranges_r[:-2]
 
 
 # @app.callback(
@@ -73,6 +76,88 @@ def update_timeline():
         autosize=True,
     )
     fig = go.Figure(data=traces, layout=layout)
+
+    return fig
+
+
+fig_map = None
+
+
+def update_map():
+    fig = px.choropleth(
+        counts_by_date,
+        animation_frame="month",
+        animation_group="country",
+        locations="country",
+        locationmode="country names",
+        color="count",
+        color_continuous_scale=custom_oranges_r,
+        range_color=[0, counts_by_date["count"].max()],
+        scope="europe",
+        labels={
+            "month": "Month",
+            "country": "Country/Region: ",
+            "count": "Numbers of Entries",
+        },
+        title="Countries and Regions discussed by month",
+    )
+
+    # Update map appeareance
+    fig.update_layout(
+        geo=dict(
+            showframe=False,
+            showlakes=False,
+            showcoastlines=False,
+            landcolor="#000000",  # set default land color to black (to match colorscale above)
+        ),
+    )
+
+    # Add dropdown to choose the scope of the map
+    fig.update_layout(
+        updatemenus=list(fig.layout.updatemenus)
+        + [
+            dict(
+                buttons=list(
+                    [
+                        dict(
+                            args=["geo.scope", "europe"],
+                            label="Europe",
+                            method="relayout",
+                        ),
+                        dict(
+                            args=["geo.scope", "world"],
+                            label="World",
+                            method="relayout",
+                        ),
+                    ]
+                ),
+                direction="down",
+                # pad={"r": 10, "t": 10},
+                showactive=True,
+                x=0.06,
+                xanchor="left",
+                y=1.006,
+                yanchor="top",
+            ),
+        ],
+        annotations=[
+            dict(
+                text="Scope: ",
+                showarrow=False,
+                x=0,
+                y=1,
+                yref="paper",
+                align="left",
+                xanchor="left",
+                yanchor="top",
+            )
+        ],
+    )
+
+    # Speed up animation
+    play_button = fig.layout.updatemenus[0].buttons[0]
+    play_button.args[1]["frame"]["duration"] = 100
+    play_button.args[1]["transition"]["duration"] = 1000
 
     return fig
 

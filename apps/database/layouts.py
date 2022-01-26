@@ -1,7 +1,7 @@
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 
-from apps.database.callbacks import update_timeline
+from apps.database.callbacks import update_map, update_timeline
 from apps.layouts import empty_line, header
 
 table_header = [
@@ -54,12 +54,39 @@ graphs = dbc.Row(
     className="full-height",
 )
 
+map_scope_choices = {"Europe": "europe", "World": "world"}
+map_scope_choices_default = "europe"
+
+map = dbc.Row(
+    [
+        dbc.Col(
+            dcc.Markdown(),
+            id="descr-map",
+        ),
+        dbc.Col(
+            children=[
+                dcc.Graph(
+                    id="fig-map",
+                    figure=update_map(),
+                    style={
+                        "height": "100%",
+                        ".gtitle": "{background-color: red;}",
+                    },
+                )
+            ],
+            width=8,
+        ),
+    ],
+    className="full-height",
+)
+
 layout = [
     header,
     empty_line,
     dbc.Container(
         [empty_line, graphs], fluid=True, className="custom-container"
     ),
+    dbc.Container([empty_line, map], fluid=True, className="custom-container"),
 ]
 
 # html.Div(children=[
