@@ -1,13 +1,17 @@
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 from dash import html
 from dash.dependencies import Input, Output
 from plotly import graph_objects as go
+from plotly.subplots import make_subplots
 
+from analysis.cooccurrence import CoOccurrence
 from app import app
 from apps.database.data import counts_by_date, date_language, df
+from apps.util import sort
 
 custom_oranges_r = ["#000000"] + px.colors.sequential.Oranges_r[:-2]
 
@@ -80,9 +84,6 @@ def update_timeline():
     return fig
 
 
-fig_map = None
-
-
 def update_map():
     fig = px.choropleth(
         counts_by_date,
@@ -102,7 +103,7 @@ def update_map():
         title="Countries and Regions discussed by month",
     )
 
-    # Update map appeareance
+    # Update map appearance
     fig.update_layout(
         geo=dict(
             showframe=False,
@@ -156,8 +157,120 @@ def update_map():
 
     # Speed up animation
     play_button = fig.layout.updatemenus[0].buttons[0]
-    play_button.args[1]["frame"]["duration"] = 100
+    play_button.args[1]["frame"]["duration"] = 50
     play_button.args[1]["transition"]["duration"] = 1000
+
+    return fig
+
+
+def update_heatmap():
+    LC_cooc = CoOccurrence()
+    for ls, cs in zip(df["language"], df["country"]):
+        LC_cooc.update(ls.split("+"), cs.split("+"))
+
+    LK_cooc = CoOccurrence()
+    for ls, k in zip(df["language"], df["keyword"]):
+        LK_cooc.update(ls.split("+"), k.split("+"))
+
+    LL_cooc = CoOccurrence()
+    for ls in df["language"]:
+        LL_cooc.update(ls.split("+"), ls.split("+"))
+
+    KK_cooc = CoOccurrence()
+    for k in df["keyword"]:
+        KK_cooc.update(k.split("+"), k.split("+"))
+
+    LC = sort(LC_cooc.get_dataframe())
+    LK = sort(LK_cooc.get_dataframe())
+    KK = sort(KK_cooc.get_dataframe())
+
+    # plot_raw(KK)
+    # plot_raw(LC)
+    # plot_raw(LK)
+
+    # plot_graph(KK)
+    # plot_sankey(LC.transpose())
+    # plot_marginal(LC)
+    # plot_marginal(LK)
+
+    LL_cooc = CoOccurrence()
+    for _, group in df[["id", "language"]].drop_duplicates().groupby("id"):
+        LL_cooc.update(group["language"], group["language"])
+
+    LL = sort(LL_cooc.get_dataframe())
+    np.fill_diagonal(LL.values, np.nan)
+
+    #########################################################
+    df_hm = LL
+
+    sum_of_rows = df_hm.sum(axis="columns")
+    sum_of_cols = df_hm.sum(axis="index")
+    df_hm["sum_of_rows"] = sum_of_rows
+    df_hm.loc["sum_of_cols"] = sum_of_cols
+    df_hm = df_hm.sort_values(
+        by="sum_of_rows", ascending=False, axis="index"
+    ).sort_values(by="sum_of_cols", ascending=False, axis="columns")
+
+    ##################################
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        row_heights=[0.2, 0.8],
+        column_width=[0.8, 0.2],
+        vertical_spacing=0.01,
+        horizontal_spacing=0.01,
+    )
+    # fig.update_layout(template="plotly_dark")
+
+    # #####
+    #     fig = ff.create_dendrogram(df.values, orientation='bottom')
+    #     fig.for_each_trace(lambda trace: trace.update(visible=False))
+    #     for i in range(len(fig['data'])):
+    #         fig['data'][i]['yaxis'] = 'y2'
+    #
+    #     #############
+
+    colorscale = "solar"
+
+    fig.add_trace(
+        go.Bar(
+            y=df_hm.transpose()["sum_of_cols"],
+            x=df_hm.columns[:-1],
+            showlegend=False,
+            marker=dict(
+                color=df_hm.transpose()["sum_of_cols"], colorscale=colorscale
+            ),
+        ),
+        row=1,
+        col=1,
+    )
+    fig.update_xaxes(visible=False, row=1, col=1)
+    fig.add_trace(
+        go.Bar(
+            x=df_hm["sum_of_rows"],
+            y=df_hm.index[:-1],
+            orientation="h",
+            showlegend=False,
+            marker=dict(color=df_hm["sum_of_rows"], colorscale=colorscale),
+        ),
+        row=2,
+        col=2,
+    )
+    fig.update_yaxes(visible=False, row=2, col=2)
+
+    fig.add_heatmap(
+        z=df_hm.drop("sum_of_rows", axis="columns").drop(
+            "sum_of_cols", axis="index"
+        ),
+        x=df_hm.columns[:-1],
+        y=df_hm.index[:-1],
+        hoverongaps=False,
+        showlegend=False,
+        showscale=False,
+        colorscale=colorscale,
+        row=2,
+        col=1,
+    )
 
     return fig
 

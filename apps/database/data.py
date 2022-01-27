@@ -5,12 +5,13 @@ import pandas as pd
 from apps.util import explode_replace
 
 # Data
-cols = ["id", "title", "date", "languages", "countries"]
+cols = ["id", "title", "date", "languages", "countries", "keywords"]
 dtypes = {c: "string" for c in cols}
 df = pd.read_csv("data/posts.csv", usecols=cols, dtype=dtypes).fillna("")
 df["date"] = pd.to_datetime(df["date"])
 df = explode_replace(df, "languages", "language")
 df = explode_replace(df, "countries", "country")
+df = explode_replace(df, "keywords", "keyword")
 
 # Number of entries per language per date
 date_language = df[["date", "language"]]
