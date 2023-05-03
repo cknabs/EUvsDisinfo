@@ -18,7 +18,7 @@ feedfinder2==0.0.4
 feedparser==6.0.8; python_version >= "3.6"
 filelock==3.4.2; python_version >= "3.7"
 flask-compress==1.10.1; python_version >= "3.6" and python_version < "4"
-flask==2.0.2; python_version >= "3.6" and python_version < "4"
+flask==2.2.5; python_version >= "3.6" and python_version < "4"
 frictionless==4.23.2
 gunicorn==20.1.0; python_version >= "3.5"
 idna==3.3; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
